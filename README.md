@@ -1,5 +1,5 @@
 # egret-spine
-A spine runtime for Egret (Example: https://fightingcat.github.io/egret-spine/).
+A spine runtime for Egret (Demo: https://fightingcat.github.io/egret-spine/example).
 
 ## Installing
 Considering that Egret uses legacy namespace code style, neither spine official core runtime doesn't release a modular build, this runtime doesn't either, for now.
