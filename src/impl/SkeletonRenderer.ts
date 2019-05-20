@@ -170,7 +170,7 @@ namespace spine {
                     region.originalWidth, region.originalHeight
                 );
             let sprite = new egret.Bitmap(texture);
-            this.addChild(sprite);
+
             sprite.name = region.name;
             sprite.x = attachment.x;
             sprite.y = attachment.y;
@@ -182,6 +182,8 @@ namespace spine {
             if (region.rotate) {
                 sprite.rotation -= 90;
             }
+            this.addChild(sprite);
+
             return sprite;
         }
     }
