@@ -72,7 +72,6 @@ function createBoy2() {
         yield boy.play('test').waitNamedEvent('headAttach');
         while (true) {
             yield boy.play('run', 2).add('jump', 1).waitTrackEnd();
-            console.log(boy.state.tracks);
         }
     });
 }

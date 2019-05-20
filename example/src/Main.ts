@@ -72,7 +72,6 @@ async function createBoy2() {
 
     while (true) {
         await boy.play('run', 2).add('jump', 1).waitTrackEnd();
-        console.log(boy.state.tracks)
     }
 }
 
