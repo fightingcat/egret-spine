@@ -1,8 +1,8 @@
 {
     "compilerOptions": {
         "target": "es5",
-        "sourceMap": true,
         "declaration": true,
+        "inlineSourceMap": true,
         "outFile": "lib/egret-spine.js",
         "lib": [
             "dom",
