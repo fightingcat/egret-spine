@@ -32,7 +32,6 @@ namespace spine {
         public readonly state: AnimationState;
         public readonly stateData: AnimationStateData;
         public readonly slotRenderers: SlotRenderer[] = [];
-        private colored: boolean = false;
 
         public constructor(skeletonData: SkeletonData) {
             super();
@@ -41,6 +40,7 @@ namespace spine {
             this.state = new AnimationState(this.stateData);
             this.skeleton = new Skeleton(skeletonData);
             this.skeleton.updateWorldTransform();
+            this.skeleton.setSlotsToSetupPose();
             this.touchEnabled = true;
             this.scaleY = -1;
 
@@ -50,8 +50,7 @@ namespace spine {
                 renderer.name = slot.data.name;
                 this.slotRenderers.push(renderer);
                 this.addChild(renderer);
-                renderer.renderSlot(slot, this.skeleton, this.colored);
-                this.colored = renderer.colored;
+                renderer.renderSlot(slot, this.skeleton);
             }
         }
 
@@ -69,27 +68,27 @@ namespace spine {
 
             for (let i = 0; i < drawOrder.length; i++) {
                 let slot = drawOrder[i].data.index;
-                this.setChildIndex(this.slotRenderers[slot], i);
+                this.slotRenderers[slot].zIndex = i;
             }
             for (let i = 0; i < slots.length; i++) {
                 let renderer = this.slotRenderers[i];
-
-                renderer.renderSlot(slots[i], this.skeleton, this.colored);
-                this.colored = renderer.colored;
+                renderer.renderSlot(slots[i], this.skeleton);
             }
         }
     }
 
     export class SlotRenderer extends egret.DisplayObjectContainer {
-        public colored: boolean = false;
-        private currentSprite: egret.DisplayObject;
-        private colorFilter: egret.ColorMatrixFilter;
+        private currentSprite?: egret.DisplayObject;
 
-        public renderSlot(slot: Slot, skeleton: Skeleton, colored: boolean) {
+        public renderSlot(slot: Slot, skeleton: Skeleton) {
             let bone = slot.bone;
-            let attachment = slot.getAttachment() as RegionAttachment;
+            let attachment = slot.getAttachment();
             let matrix = this.matrix;
 
+            if (!bone.active) {
+                this.visible = false;
+                return;
+            }
             // update transform.
             matrix.a = bone.a;
             matrix.b = bone.c;
@@ -106,26 +105,13 @@ namespace spine {
                 this.blendMode = egret.BlendMode.NORMAL;
             }
             // update color.
-            if (attachment) {
-                let r = skeleton.color.r * slot.color.r * attachment.color.r;
-                let g = skeleton.color.g * slot.color.g * attachment.color.g;
-                let b = skeleton.color.b * slot.color.b * attachment.color.b;
-                this.alpha = skeleton.color.a * slot.color.a * attachment.color.a;
-                this.colored = colored || (r & g & b) !== 1;
-
-                if (this.colored) {
-                    if (!this.colorFilter) {
-                        this.colorFilter = new egret.ColorMatrixFilter();
-                    }
-                    this.colorFilter.matrix[0] = r;
-                    this.colorFilter.matrix[6] = g;
-                    this.colorFilter.matrix[13] = b;
-                    if (!this.filters) {
-                        this.filters = [this.colorFilter];
-                    }
-                } else {
-                    this.filters = null;
-                }
+            if (attachment && (attachment as any).color) {
+                let color = (attachment as any).color;
+                let r = skeleton.color.r * slot.color.r * color.r * 255;
+                let g = skeleton.color.g * slot.color.g * color.g * 255;
+                let b = skeleton.color.b * slot.color.b * color.b * 255;
+                this.tint = (r << 16) + (g << 8) + b;
+                this.alpha = skeleton.color.a * slot.color.a * color.a;
             }
             // only RegionAttachment is supported.
             if (attachment instanceof RegionAttachment) {
@@ -135,10 +121,10 @@ namespace spine {
                 this.visible = true;
 
                 // attachment changed.
-                if (currentName != regionName) {
+                if (currentName !== regionName) {
                     if (this.currentSprite) {
                         this.currentSprite.visible = false;
-                        this.currentSprite = null;
+                        this.currentSprite = undefined;
                     }
                     if (region) {
                         this.currentSprite = this.getChildByName(regionName) ||
@@ -148,6 +134,7 @@ namespace spine {
                 }
 
             } else {
+                // not implemented yet.
                 this.visible = false;
             }
         }

@@ -27,7 +27,7 @@ namespace spine {
     export class Track extends EventEmitter<SpineEvent> {
         public readonly trackID: number;
         public readonly skelAnimation: SkeletonAnimation;
-        private stateListener: AnimationStateListener2;
+        private stateListener: AnimationStateListener;
         private trackEntry: TrackEntry | undefined;
         private animations: AnimationRecord[] = [];
         private disposed: boolean = false;
@@ -96,8 +96,8 @@ namespace spine {
         }
 
         private setAnimation(name: string, loop: boolean) {
-            if (this.trackEntry) this.trackEntry.listener = null;
-            this.trackEntry = this.skelAnimation.state.setAnimation(this.trackID, name, loop);
+            if (this.trackEntry) this.trackEntry.listener = undefined!;
+            this.trackEntry = this.skelAnimation.state.setAnimation(this.trackID, name, loop)!;
             this.trackEntry.listener = this.stateListener;
             this.skelAnimation.renderer.update(0);
         }
@@ -149,9 +149,9 @@ namespace spine {
                         this.playNextAnimation();
                     }
                     else {
+                        this.trackEntry!.listener = undefined!;
+                        this.trackEntry = undefined;
                         this.disposed = true;
-                        this.trackEntry.listener = null;
-                        this.trackEntry = null;
                         this.emit(SpineEvent.TrackEnd);
                     }
                 }
