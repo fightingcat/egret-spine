@@ -13,9 +13,9 @@ var __extends = (this && this.__extends) || (function () {
 })();
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -28,19 +28,48 @@ var __extends = (this && this.__extends) || (function () {
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** A simple container for a list of timelines and a name. */
     var Animation = /** @class */ (function () {
         function Animation(name, timelines, duration) {
             if (name == null)
@@ -49,8 +78,19 @@ var spine;
                 throw new Error("timelines cannot be null.");
             this.name = name;
             this.timelines = timelines;
+            this.timelineIds = [];
+            for (var i = 0; i < timelines.length; i++)
+                this.timelineIds[timelines[i].getPropertyId()] = true;
             this.duration = duration;
         }
+        Animation.prototype.hasTimeline = function (id) {
+            return this.timelineIds[id] == true;
+        };
+        /** Applies all the animation's timelines to the specified skeleton.
+         *
+         * See Timeline {@link Timeline#apply(Skeleton, float, float, Array, float, MixBlend, MixDirection)}.
+         * @param loop If true, the animation repeats after {@link #getDuration()}.
+         * @param events May be null to ignore fired events. */
         Animation.prototype.apply = function (skeleton, lastTime, time, loop, events, alpha, blend, direction) {
             if (skeleton == null)
                 throw new Error("skeleton cannot be null.");
@@ -63,6 +103,8 @@ var spine;
             for (var i = 0, n = timelines.length; i < n; i++)
                 timelines[i].apply(skeleton, lastTime, time, events, alpha, blend, direction);
         };
+        /** @param target After the first and before the last value.
+         * @returns index of first value greater than the target. */
         Animation.binarySearch = function (values, target, step) {
             if (step === void 0) { step = 1; }
             var low = 0;
@@ -89,17 +131,42 @@ var spine;
         return Animation;
     }());
     spine.Animation = Animation;
+    /** Controls how a timeline value is mixed with the setup pose value or current pose value when a timeline's `alpha`
+     * < 1.
+     *
+     * See Timeline {@link Timeline#apply(Skeleton, float, float, Array, float, MixBlend, MixDirection)}. */
     var MixBlend;
     (function (MixBlend) {
+        /** Transitions from the setup value to the timeline value (the current value is not used). Before the first key, the setup
+         * value is set. */
         MixBlend[MixBlend["setup"] = 0] = "setup";
+        /** Transitions from the current value to the timeline value. Before the first key, transitions from the current value to
+         * the setup value. Timelines which perform instant transitions, such as {@link DrawOrderTimeline} or
+         * {@link AttachmentTimeline}, use the setup value before the first key.
+         *
+         * `first` is intended for the first animations applied, not for animations layered on top of those. */
         MixBlend[MixBlend["first"] = 1] = "first";
+        /** Transitions from the current value to the timeline value. No change is made before the first key (the current value is
+         * kept until the first key).
+         *
+         * `replace` is intended for animations layered on top of others, not for the first animations applied. */
         MixBlend[MixBlend["replace"] = 2] = "replace";
+        /** Transitions from the current value to the current value plus the timeline value. No change is made before the first key
+         * (the current value is kept until the first key).
+         *
+         * `add` is intended for animations layered on top of others, not for the first animations applied. Properties
+         * keyed by additive animations must be set manually or by another animation before applying the additive animations, else
+         * the property values will increase continually. */
         MixBlend[MixBlend["add"] = 3] = "add";
     })(MixBlend = spine.MixBlend || (spine.MixBlend = {}));
+    /** Indicates whether a timeline's `alpha` is mixing out over time toward 0 (the setup or current pose value) or
+     * mixing in toward 1 (the timeline's value).
+     *
+     * See Timeline {@link Timeline#apply(Skeleton, float, float, Array, float, MixBlend, MixDirection)}. */
     var MixDirection;
     (function (MixDirection) {
-        MixDirection[MixDirection["in"] = 0] = "in";
-        MixDirection[MixDirection["out"] = 1] = "out";
+        MixDirection[MixDirection["mixIn"] = 0] = "mixIn";
+        MixDirection[MixDirection["mixOut"] = 1] = "mixOut";
     })(MixDirection = spine.MixDirection || (spine.MixDirection = {}));
     var TimelineType;
     (function (TimelineType) {
@@ -119,21 +186,27 @@ var spine;
         TimelineType[TimelineType["pathConstraintMix"] = 13] = "pathConstraintMix";
         TimelineType[TimelineType["twoColor"] = 14] = "twoColor";
     })(TimelineType = spine.TimelineType || (spine.TimelineType = {}));
+    /** The base class for timelines that use interpolation between key frame values. */
     var CurveTimeline = /** @class */ (function () {
         function CurveTimeline(frameCount) {
             if (frameCount <= 0)
                 throw new Error("frameCount must be > 0: " + frameCount);
             this.curves = spine.Utils.newFloatArray((frameCount - 1) * CurveTimeline.BEZIER_SIZE);
         }
+        /** The number of key frames for this timeline. */
         CurveTimeline.prototype.getFrameCount = function () {
             return this.curves.length / CurveTimeline.BEZIER_SIZE + 1;
         };
+        /** Sets the specified key frame to linear interpolation. */
         CurveTimeline.prototype.setLinear = function (frameIndex) {
             this.curves[frameIndex * CurveTimeline.BEZIER_SIZE] = CurveTimeline.LINEAR;
         };
+        /** Sets the specified key frame to stepped interpolation. */
         CurveTimeline.prototype.setStepped = function (frameIndex) {
             this.curves[frameIndex * CurveTimeline.BEZIER_SIZE] = CurveTimeline.STEPPED;
         };
+        /** Returns the interpolation type for the specified key frame.
+         * @returns Linear is 0, stepped is 1, Bezier is 2. */
         CurveTimeline.prototype.getCurveType = function (frameIndex) {
             var index = frameIndex * CurveTimeline.BEZIER_SIZE;
             if (index == this.curves.length)
@@ -145,9 +218,9 @@ var spine;
                 return CurveTimeline.STEPPED;
             return CurveTimeline.BEZIER;
         };
-        /** Sets the control handle positions for an interpolation bezier curve used to transition from this keyframe to the next.
-         * cx1 and cx2 are from 0 to 1, representing the percent of time between the two keyframes. cy1 and cy2 are the percent of
-         * the difference between the keyframe's values. */
+        /** Sets the specified key frame to Bezier interpolation. `cx1` and `cx2` are from 0 to 1,
+         * representing the percent of time between the two key frames. `cy1` and `cy2` are the percent of the
+         * difference between the key frame's values. */
         CurveTimeline.prototype.setCurve = function (frameIndex, cx1, cy1, cx2, cy2) {
             var tmpx = (-cx1 * 2 + cx2) * 0.03, tmpy = (-cy1 * 2 + cy2) * 0.03;
             var dddfx = ((cx1 - cx2) * 3 + 1) * 0.006, dddfy = ((cy1 - cy2) * 3 + 1) * 0.006;
@@ -168,6 +241,7 @@ var spine;
                 y += dfy;
             }
         };
+        /** Returns the interpolated percentage for the specified key frame and linear percentage. */
         CurveTimeline.prototype.getCurvePercent = function (frameIndex, percent) {
             percent = spine.MathUtils.clamp(percent, 0, 1);
             var curves = this.curves;
@@ -204,6 +278,7 @@ var spine;
         return CurveTimeline;
     }());
     spine.CurveTimeline = CurveTimeline;
+    /** Changes a bone's local {@link Bone#rotation}. */
     var RotateTimeline = /** @class */ (function (_super) {
         __extends(RotateTimeline, _super);
         function RotateTimeline(frameCount) {
@@ -223,6 +298,8 @@ var spine;
         RotateTimeline.prototype.apply = function (skeleton, lastTime, time, events, alpha, blend, direction) {
             var frames = this.frames;
             var bone = skeleton.bones[this.boneIndex];
+            if (!bone.active)
+                return;
             if (time < frames[0]) {
                 switch (blend) {
                     case MixBlend.setup:
@@ -274,6 +351,7 @@ var spine;
         return RotateTimeline;
     }(CurveTimeline));
     spine.RotateTimeline = RotateTimeline;
+    /** Changes a bone's local {@link Bone#x} and {@link Bone#y}. */
     var TranslateTimeline = /** @class */ (function (_super) {
         __extends(TranslateTimeline, _super);
         function TranslateTimeline(frameCount) {
@@ -284,7 +362,7 @@ var spine;
         TranslateTimeline.prototype.getPropertyId = function () {
             return (TimelineType.translate << 24) + this.boneIndex;
         };
-        /** Sets the time and value of the specified keyframe. */
+        /** Sets the time in seconds, x, and y values for the specified key frame. */
         TranslateTimeline.prototype.setFrame = function (frameIndex, time, x, y) {
             frameIndex *= TranslateTimeline.ENTRIES;
             this.frames[frameIndex] = time;
@@ -294,6 +372,8 @@ var spine;
         TranslateTimeline.prototype.apply = function (skeleton, lastTime, time, events, alpha, blend, direction) {
             var frames = this.frames;
             var bone = skeleton.bones[this.boneIndex];
+            if (!bone.active)
+                return;
             if (time < frames[0]) {
                 switch (blend) {
                     case MixBlend.setup:
@@ -345,6 +425,7 @@ var spine;
         return TranslateTimeline;
     }(CurveTimeline));
     spine.TranslateTimeline = TranslateTimeline;
+    /** Changes a bone's local {@link Bone#scaleX)} and {@link Bone#scaleY}. */
     var ScaleTimeline = /** @class */ (function (_super) {
         __extends(ScaleTimeline, _super);
         function ScaleTimeline(frameCount) {
@@ -356,6 +437,8 @@ var spine;
         ScaleTimeline.prototype.apply = function (skeleton, lastTime, time, events, alpha, blend, direction) {
             var frames = this.frames;
             var bone = skeleton.bones[this.boneIndex];
+            if (!bone.active)
+                return;
             if (time < frames[0]) {
                 switch (blend) {
                     case MixBlend.setup:
@@ -395,7 +478,7 @@ var spine;
             }
             else {
                 var bx = 0, by = 0;
-                if (direction == MixDirection.out) {
+                if (direction == MixDirection.mixOut) {
                     switch (blend) {
                         case MixBlend.setup:
                             bx = bone.data.scaleX;
@@ -444,6 +527,7 @@ var spine;
         return ScaleTimeline;
     }(TranslateTimeline));
     spine.ScaleTimeline = ScaleTimeline;
+    /** Changes a bone's local {@link Bone#shearX} and {@link Bone#shearY}. */
     var ShearTimeline = /** @class */ (function (_super) {
         __extends(ShearTimeline, _super);
         function ShearTimeline(frameCount) {
@@ -455,6 +539,8 @@ var spine;
         ShearTimeline.prototype.apply = function (skeleton, lastTime, time, events, alpha, blend, direction) {
             var frames = this.frames;
             var bone = skeleton.bones[this.boneIndex];
+            if (!bone.active)
+                return;
             if (time < frames[0]) {
                 switch (blend) {
                     case MixBlend.setup:
@@ -500,6 +586,7 @@ var spine;
         return ShearTimeline;
     }(TranslateTimeline));
     spine.ShearTimeline = ShearTimeline;
+    /** Changes a slot's {@link Slot#color}. */
     var ColorTimeline = /** @class */ (function (_super) {
         __extends(ColorTimeline, _super);
         function ColorTimeline(frameCount) {
@@ -510,7 +597,7 @@ var spine;
         ColorTimeline.prototype.getPropertyId = function () {
             return (TimelineType.color << 24) + this.slotIndex;
         };
-        /** Sets the time and value of the specified keyframe. */
+        /** Sets the time in seconds, red, green, blue, and alpha for the specified key frame. */
         ColorTimeline.prototype.setFrame = function (frameIndex, time, r, g, b, a) {
             frameIndex *= ColorTimeline.ENTRIES;
             this.frames[frameIndex] = time;
@@ -521,6 +608,8 @@ var spine;
         };
         ColorTimeline.prototype.apply = function (skeleton, lastTime, time, events, alpha, blend, direction) {
             var slot = skeleton.slots[this.slotIndex];
+            if (!slot.bone.active)
+                return;
             var frames = this.frames;
             if (time < frames[0]) {
                 switch (blend) {
@@ -577,6 +666,7 @@ var spine;
         return ColorTimeline;
     }(CurveTimeline));
     spine.ColorTimeline = ColorTimeline;
+    /** Changes a slot's {@link Slot#color} and {@link Slot#darkColor} for two color tinting. */
     var TwoColorTimeline = /** @class */ (function (_super) {
         __extends(TwoColorTimeline, _super);
         function TwoColorTimeline(frameCount) {
@@ -587,7 +677,7 @@ var spine;
         TwoColorTimeline.prototype.getPropertyId = function () {
             return (TimelineType.twoColor << 24) + this.slotIndex;
         };
-        /** Sets the time and value of the specified keyframe. */
+        /** Sets the time in seconds, light, and dark colors for the specified key frame. */
         TwoColorTimeline.prototype.setFrame = function (frameIndex, time, r, g, b, a, r2, g2, b2) {
             frameIndex *= TwoColorTimeline.ENTRIES;
             this.frames[frameIndex] = time;
@@ -601,6 +691,8 @@ var spine;
         };
         TwoColorTimeline.prototype.apply = function (skeleton, lastTime, time, events, alpha, blend, direction) {
             var slot = skeleton.slots[this.slotIndex];
+            if (!slot.bone.active)
+                return;
             var frames = this.frames;
             if (time < frames[0]) {
                 switch (blend) {
@@ -679,6 +771,7 @@ var spine;
         return TwoColorTimeline;
     }(CurveTimeline));
     spine.TwoColorTimeline = TwoColorTimeline;
+    /** Changes a slot's {@link Slot#attachment}. */
     var AttachmentTimeline = /** @class */ (function () {
         function AttachmentTimeline(frameCount) {
             this.frames = spine.Utils.newFloatArray(frameCount);
@@ -687,27 +780,28 @@ var spine;
         AttachmentTimeline.prototype.getPropertyId = function () {
             return (TimelineType.attachment << 24) + this.slotIndex;
         };
+        /** The number of key frames for this timeline. */
         AttachmentTimeline.prototype.getFrameCount = function () {
             return this.frames.length;
         };
-        /** Sets the time and value of the specified keyframe. */
+        /** Sets the time in seconds and the attachment name for the specified key frame. */
         AttachmentTimeline.prototype.setFrame = function (frameIndex, time, attachmentName) {
             this.frames[frameIndex] = time;
             this.attachmentNames[frameIndex] = attachmentName;
         };
         AttachmentTimeline.prototype.apply = function (skeleton, lastTime, time, events, alpha, blend, direction) {
             var slot = skeleton.slots[this.slotIndex];
-            if (direction == MixDirection.out && blend == MixBlend.setup) {
-                var attachmentName_1 = slot.data.attachmentName;
-                slot.setAttachment(attachmentName_1 == null ? null : skeleton.getAttachment(this.slotIndex, attachmentName_1));
+            if (!slot.bone.active)
+                return;
+            if (direction == MixDirection.mixOut) {
+                if (blend == MixBlend.setup)
+                    this.setAttachment(skeleton, slot, slot.data.attachmentName);
                 return;
             }
             var frames = this.frames;
             if (time < frames[0]) {
-                if (blend == MixBlend.setup || blend == MixBlend.first) {
-                    var attachmentName_2 = slot.data.attachmentName;
-                    slot.setAttachment(attachmentName_2 == null ? null : skeleton.getAttachment(this.slotIndex, attachmentName_2));
-                }
+                if (blend == MixBlend.setup || blend == MixBlend.first)
+                    this.setAttachment(skeleton, slot, slot.data.attachmentName);
                 return;
             }
             var frameIndex = 0;
@@ -719,10 +813,14 @@ var spine;
             skeleton.slots[this.slotIndex]
                 .setAttachment(attachmentName == null ? null : skeleton.getAttachment(this.slotIndex, attachmentName));
         };
+        AttachmentTimeline.prototype.setAttachment = function (skeleton, slot, attachmentName) {
+            slot.attachment = attachmentName == null ? null : skeleton.getAttachment(this.slotIndex, attachmentName);
+        };
         return AttachmentTimeline;
     }());
     spine.AttachmentTimeline = AttachmentTimeline;
     var zeros = null;
+    /** Changes a slot's {@link Slot#deform} to deform a {@link VertexAttachment}. */
     var DeformTimeline = /** @class */ (function (_super) {
         __extends(DeformTimeline, _super);
         function DeformTimeline(frameCount) {
@@ -736,18 +834,21 @@ var spine;
         DeformTimeline.prototype.getPropertyId = function () {
             return (TimelineType.deform << 27) + +this.attachment.id + this.slotIndex;
         };
-        /** Sets the time of the specified keyframe. */
+        /** Sets the time in seconds and the vertices for the specified key frame.
+         * @param vertices Vertex positions for an unweighted VertexAttachment, or deform offsets if it has weights. */
         DeformTimeline.prototype.setFrame = function (frameIndex, time, vertices) {
             this.frames[frameIndex] = time;
             this.frameVertices[frameIndex] = vertices;
         };
         DeformTimeline.prototype.apply = function (skeleton, lastTime, time, firedEvents, alpha, blend, direction) {
             var slot = skeleton.slots[this.slotIndex];
-            var slotAttachment = slot.getAttachment();
-            if (!(slotAttachment instanceof spine.VertexAttachment) || !slotAttachment.applyDeform(this.attachment))
+            if (!slot.bone.active)
                 return;
-            var verticesArray = slot.attachmentVertices;
-            if (verticesArray.length == 0)
+            var slotAttachment = slot.getAttachment();
+            if (!(slotAttachment instanceof spine.VertexAttachment) || !(slotAttachment.deformAttachment == this.attachment))
+                return;
+            var deformArray = slot.deform;
+            if (deformArray.length == 0)
                 blend = MixBlend.setup;
             var frameVertices = this.frameVertices;
             var vertexCount = frameVertices[0].length;
@@ -756,30 +857,30 @@ var spine;
                 var vertexAttachment = slotAttachment;
                 switch (blend) {
                     case MixBlend.setup:
-                        verticesArray.length = 0;
+                        deformArray.length = 0;
                         return;
                     case MixBlend.first:
                         if (alpha == 1) {
-                            verticesArray.length = 0;
+                            deformArray.length = 0;
                             break;
                         }
-                        var vertices_1 = spine.Utils.setArraySize(verticesArray, vertexCount);
+                        var deform_1 = spine.Utils.setArraySize(deformArray, vertexCount);
                         if (vertexAttachment.bones == null) {
                             // Unweighted vertex positions.
                             var setupVertices = vertexAttachment.vertices;
                             for (var i = 0; i < vertexCount; i++)
-                                vertices_1[i] += (setupVertices[i] - vertices_1[i]) * alpha;
+                                deform_1[i] += (setupVertices[i] - deform_1[i]) * alpha;
                         }
                         else {
                             // Weighted deform offsets.
                             alpha = 1 - alpha;
                             for (var i = 0; i < vertexCount; i++)
-                                vertices_1[i] *= alpha;
+                                deform_1[i] *= alpha;
                         }
                 }
                 return;
             }
-            var vertices = spine.Utils.setArraySize(verticesArray, vertexCount);
+            var deform = spine.Utils.setArraySize(deformArray, vertexCount);
             if (time >= frames[frames.length - 1]) { // Time is after last frame.
                 var lastVertices = frameVertices[frames.length - 1];
                 if (alpha == 1) {
@@ -789,17 +890,17 @@ var spine;
                             // Unweighted vertex positions, with alpha.
                             var setupVertices = vertexAttachment.vertices;
                             for (var i_1 = 0; i_1 < vertexCount; i_1++) {
-                                vertices[i_1] += lastVertices[i_1] - setupVertices[i_1];
+                                deform[i_1] += lastVertices[i_1] - setupVertices[i_1];
                             }
                         }
                         else {
                             // Weighted deform offsets, with alpha.
                             for (var i_2 = 0; i_2 < vertexCount; i_2++)
-                                vertices[i_2] += lastVertices[i_2];
+                                deform[i_2] += lastVertices[i_2];
                         }
                     }
                     else {
-                        spine.Utils.arrayCopy(lastVertices, 0, vertices, 0, vertexCount);
+                        spine.Utils.arrayCopy(lastVertices, 0, deform, 0, vertexCount);
                     }
                 }
                 else {
@@ -811,33 +912,34 @@ var spine;
                                 var setupVertices = vertexAttachment_1.vertices;
                                 for (var i_3 = 0; i_3 < vertexCount; i_3++) {
                                     var setup = setupVertices[i_3];
-                                    vertices[i_3] = setup + (lastVertices[i_3] - setup) * alpha;
+                                    deform[i_3] = setup + (lastVertices[i_3] - setup) * alpha;
                                 }
                             }
                             else {
                                 // Weighted deform offsets, with alpha.
                                 for (var i_4 = 0; i_4 < vertexCount; i_4++)
-                                    vertices[i_4] = lastVertices[i_4] * alpha;
+                                    deform[i_4] = lastVertices[i_4] * alpha;
                             }
                             break;
                         }
                         case MixBlend.first:
                         case MixBlend.replace:
                             for (var i_5 = 0; i_5 < vertexCount; i_5++)
-                                vertices[i_5] += (lastVertices[i_5] - vertices[i_5]) * alpha;
+                                deform[i_5] += (lastVertices[i_5] - deform[i_5]) * alpha;
+                            break;
                         case MixBlend.add:
                             var vertexAttachment = slotAttachment;
                             if (vertexAttachment.bones == null) {
                                 // Unweighted vertex positions, with alpha.
                                 var setupVertices = vertexAttachment.vertices;
                                 for (var i_6 = 0; i_6 < vertexCount; i_6++) {
-                                    vertices[i_6] += (lastVertices[i_6] - setupVertices[i_6]) * alpha;
+                                    deform[i_6] += (lastVertices[i_6] - setupVertices[i_6]) * alpha;
                                 }
                             }
                             else {
                                 // Weighted deform offsets, with alpha.
                                 for (var i_7 = 0; i_7 < vertexCount; i_7++)
-                                    vertices[i_7] += lastVertices[i_7] * alpha;
+                                    deform[i_7] += lastVertices[i_7] * alpha;
                             }
                     }
                 }
@@ -857,21 +959,21 @@ var spine;
                         var setupVertices = vertexAttachment.vertices;
                         for (var i_8 = 0; i_8 < vertexCount; i_8++) {
                             var prev = prevVertices[i_8];
-                            vertices[i_8] += prev + (nextVertices[i_8] - prev) * percent - setupVertices[i_8];
+                            deform[i_8] += prev + (nextVertices[i_8] - prev) * percent - setupVertices[i_8];
                         }
                     }
                     else {
                         // Weighted deform offsets, with alpha.
                         for (var i_9 = 0; i_9 < vertexCount; i_9++) {
                             var prev = prevVertices[i_9];
-                            vertices[i_9] += prev + (nextVertices[i_9] - prev) * percent;
+                            deform[i_9] += prev + (nextVertices[i_9] - prev) * percent;
                         }
                     }
                 }
                 else {
                     for (var i_10 = 0; i_10 < vertexCount; i_10++) {
                         var prev = prevVertices[i_10];
-                        vertices[i_10] = prev + (nextVertices[i_10] - prev) * percent;
+                        deform[i_10] = prev + (nextVertices[i_10] - prev) * percent;
                     }
                 }
             }
@@ -884,14 +986,14 @@ var spine;
                             var setupVertices = vertexAttachment_2.vertices;
                             for (var i_11 = 0; i_11 < vertexCount; i_11++) {
                                 var prev = prevVertices[i_11], setup = setupVertices[i_11];
-                                vertices[i_11] = setup + (prev + (nextVertices[i_11] - prev) * percent - setup) * alpha;
+                                deform[i_11] = setup + (prev + (nextVertices[i_11] - prev) * percent - setup) * alpha;
                             }
                         }
                         else {
                             // Weighted deform offsets, with alpha.
                             for (var i_12 = 0; i_12 < vertexCount; i_12++) {
                                 var prev = prevVertices[i_12];
-                                vertices[i_12] = (prev + (nextVertices[i_12] - prev) * percent) * alpha;
+                                deform[i_12] = (prev + (nextVertices[i_12] - prev) * percent) * alpha;
                             }
                         }
                         break;
@@ -900,7 +1002,7 @@ var spine;
                     case MixBlend.replace:
                         for (var i_13 = 0; i_13 < vertexCount; i_13++) {
                             var prev = prevVertices[i_13];
-                            vertices[i_13] += (prev + (nextVertices[i_13] - prev) * percent - vertices[i_13]) * alpha;
+                            deform[i_13] += (prev + (nextVertices[i_13] - prev) * percent - deform[i_13]) * alpha;
                         }
                         break;
                     case MixBlend.add:
@@ -910,14 +1012,14 @@ var spine;
                             var setupVertices = vertexAttachment.vertices;
                             for (var i_14 = 0; i_14 < vertexCount; i_14++) {
                                 var prev = prevVertices[i_14];
-                                vertices[i_14] += (prev + (nextVertices[i_14] - prev) * percent - setupVertices[i_14]) * alpha;
+                                deform[i_14] += (prev + (nextVertices[i_14] - prev) * percent - setupVertices[i_14]) * alpha;
                             }
                         }
                         else {
                             // Weighted deform offsets, with alpha.
                             for (var i_15 = 0; i_15 < vertexCount; i_15++) {
                                 var prev = prevVertices[i_15];
-                                vertices[i_15] += (prev + (nextVertices[i_15] - prev) * percent) * alpha;
+                                deform[i_15] += (prev + (nextVertices[i_15] - prev) * percent) * alpha;
                             }
                         }
                 }
@@ -926,6 +1028,7 @@ var spine;
         return DeformTimeline;
     }(CurveTimeline));
     spine.DeformTimeline = DeformTimeline;
+    /** Fires an {@link Event} when specific animation times are reached. */
     var EventTimeline = /** @class */ (function () {
         function EventTimeline(frameCount) {
             this.frames = spine.Utils.newFloatArray(frameCount);
@@ -934,15 +1037,16 @@ var spine;
         EventTimeline.prototype.getPropertyId = function () {
             return TimelineType.event << 24;
         };
+        /** The number of key frames for this timeline. */
         EventTimeline.prototype.getFrameCount = function () {
             return this.frames.length;
         };
-        /** Sets the time of the specified keyframe. */
+        /** Sets the time in seconds and the event for the specified key frame. */
         EventTimeline.prototype.setFrame = function (frameIndex, event) {
             this.frames[frameIndex] = event.time;
             this.events[frameIndex] = event;
         };
-        /** Fires events for frames > lastTime and <= time. */
+        /** Fires events for frames > `lastTime` and <= `time`. */
         EventTimeline.prototype.apply = function (skeleton, lastTime, time, firedEvents, alpha, blend, direction) {
             if (firedEvents == null)
                 return;
@@ -974,6 +1078,7 @@ var spine;
         return EventTimeline;
     }());
     spine.EventTimeline = EventTimeline;
+    /** Changes a skeleton's {@link Skeleton#drawOrder}. */
     var DrawOrderTimeline = /** @class */ (function () {
         function DrawOrderTimeline(frameCount) {
             this.frames = spine.Utils.newFloatArray(frameCount);
@@ -982,11 +1087,13 @@ var spine;
         DrawOrderTimeline.prototype.getPropertyId = function () {
             return TimelineType.drawOrder << 24;
         };
+        /** The number of key frames for this timeline. */
         DrawOrderTimeline.prototype.getFrameCount = function () {
             return this.frames.length;
         };
-        /** Sets the time of the specified keyframe.
-         * @param drawOrder May be null to use bind pose draw order. */
+        /** Sets the time in seconds and the draw order for the specified key frame.
+         * @param drawOrder For each slot in {@link Skeleton#slots}, the index of the new draw order. May be null to use setup pose
+         *           draw order. */
         DrawOrderTimeline.prototype.setFrame = function (frameIndex, time, drawOrder) {
             this.frames[frameIndex] = time;
             this.drawOrders[frameIndex] = drawOrder;
@@ -994,8 +1101,9 @@ var spine;
         DrawOrderTimeline.prototype.apply = function (skeleton, lastTime, time, firedEvents, alpha, blend, direction) {
             var drawOrder = skeleton.drawOrder;
             var slots = skeleton.slots;
-            if (direction == MixDirection.out && blend == MixBlend.setup) {
-                spine.Utils.arrayCopy(skeleton.slots, 0, skeleton.drawOrder, 0, skeleton.slots.length);
+            if (direction == MixDirection.mixOut) {
+                if (blend == MixBlend.setup)
+                    spine.Utils.arrayCopy(skeleton.slots, 0, skeleton.drawOrder, 0, skeleton.slots.length);
                 return;
             }
             var frames = this.frames;
@@ -1020,6 +1128,8 @@ var spine;
         return DrawOrderTimeline;
     }());
     spine.DrawOrderTimeline = DrawOrderTimeline;
+    /** Changes an IK constraint's {@link IkConstraint#mix}, {@link IkConstraint#softness},
+     * {@link IkConstraint#bendDirection}, {@link IkConstraint#stretch}, and {@link IkConstraint#compress}. */
     var IkConstraintTimeline = /** @class */ (function (_super) {
         __extends(IkConstraintTimeline, _super);
         function IkConstraintTimeline(frameCount) {
@@ -1030,11 +1140,12 @@ var spine;
         IkConstraintTimeline.prototype.getPropertyId = function () {
             return (TimelineType.ikConstraint << 24) + this.ikConstraintIndex;
         };
-        /** Sets the time, mix and bend direction of the specified keyframe. */
-        IkConstraintTimeline.prototype.setFrame = function (frameIndex, time, mix, bendDirection, compress, stretch) {
+        /** Sets the time in seconds, mix, softness, bend direction, compress, and stretch for the specified key frame. */
+        IkConstraintTimeline.prototype.setFrame = function (frameIndex, time, mix, softness, bendDirection, compress, stretch) {
             frameIndex *= IkConstraintTimeline.ENTRIES;
             this.frames[frameIndex] = time;
             this.frames[frameIndex + IkConstraintTimeline.MIX] = mix;
+            this.frames[frameIndex + IkConstraintTimeline.SOFTNESS] = softness;
             this.frames[frameIndex + IkConstraintTimeline.BEND_DIRECTION] = bendDirection;
             this.frames[frameIndex + IkConstraintTimeline.COMPRESS] = compress ? 1 : 0;
             this.frames[frameIndex + IkConstraintTimeline.STRETCH] = stretch ? 1 : 0;
@@ -1042,16 +1153,20 @@ var spine;
         IkConstraintTimeline.prototype.apply = function (skeleton, lastTime, time, firedEvents, alpha, blend, direction) {
             var frames = this.frames;
             var constraint = skeleton.ikConstraints[this.ikConstraintIndex];
+            if (!constraint.active)
+                return;
             if (time < frames[0]) {
                 switch (blend) {
                     case MixBlend.setup:
                         constraint.mix = constraint.data.mix;
+                        constraint.softness = constraint.data.softness;
                         constraint.bendDirection = constraint.data.bendDirection;
                         constraint.compress = constraint.data.compress;
                         constraint.stretch = constraint.data.stretch;
                         return;
                     case MixBlend.first:
                         constraint.mix += (constraint.data.mix - constraint.mix) * alpha;
+                        constraint.softness += (constraint.data.softness - constraint.softness) * alpha;
                         constraint.bendDirection = constraint.data.bendDirection;
                         constraint.compress = constraint.data.compress;
                         constraint.stretch = constraint.data.stretch;
@@ -1061,7 +1176,9 @@ var spine;
             if (time >= frames[frames.length - IkConstraintTimeline.ENTRIES]) { // Time is after last frame.
                 if (blend == MixBlend.setup) {
                     constraint.mix = constraint.data.mix + (frames[frames.length + IkConstraintTimeline.PREV_MIX] - constraint.data.mix) * alpha;
-                    if (direction == MixDirection.out) {
+                    constraint.softness = constraint.data.softness
+                        + (frames[frames.length + IkConstraintTimeline.PREV_SOFTNESS] - constraint.data.softness) * alpha;
+                    if (direction == MixDirection.mixOut) {
                         constraint.bendDirection = constraint.data.bendDirection;
                         constraint.compress = constraint.data.compress;
                         constraint.stretch = constraint.data.stretch;
@@ -1074,7 +1191,8 @@ var spine;
                 }
                 else {
                     constraint.mix += (frames[frames.length + IkConstraintTimeline.PREV_MIX] - constraint.mix) * alpha;
-                    if (direction == MixDirection.in) {
+                    constraint.softness += (frames[frames.length + IkConstraintTimeline.PREV_SOFTNESS] - constraint.softness) * alpha;
+                    if (direction == MixDirection.mixIn) {
                         constraint.bendDirection = frames[frames.length + IkConstraintTimeline.PREV_BEND_DIRECTION];
                         constraint.compress = frames[frames.length + IkConstraintTimeline.PREV_COMPRESS] != 0;
                         constraint.stretch = frames[frames.length + IkConstraintTimeline.PREV_STRETCH] != 0;
@@ -1085,11 +1203,14 @@ var spine;
             // Interpolate between the previous frame and the current frame.
             var frame = Animation.binarySearch(frames, time, IkConstraintTimeline.ENTRIES);
             var mix = frames[frame + IkConstraintTimeline.PREV_MIX];
+            var softness = frames[frame + IkConstraintTimeline.PREV_SOFTNESS];
             var frameTime = frames[frame];
             var percent = this.getCurvePercent(frame / IkConstraintTimeline.ENTRIES - 1, 1 - (time - frameTime) / (frames[frame + IkConstraintTimeline.PREV_TIME] - frameTime));
             if (blend == MixBlend.setup) {
                 constraint.mix = constraint.data.mix + (mix + (frames[frame + IkConstraintTimeline.MIX] - mix) * percent - constraint.data.mix) * alpha;
-                if (direction == MixDirection.out) {
+                constraint.softness = constraint.data.softness
+                    + (softness + (frames[frame + IkConstraintTimeline.SOFTNESS] - softness) * percent - constraint.data.softness) * alpha;
+                if (direction == MixDirection.mixOut) {
                     constraint.bendDirection = constraint.data.bendDirection;
                     constraint.compress = constraint.data.compress;
                     constraint.stretch = constraint.data.stretch;
@@ -1102,26 +1223,31 @@ var spine;
             }
             else {
                 constraint.mix += (mix + (frames[frame + IkConstraintTimeline.MIX] - mix) * percent - constraint.mix) * alpha;
-                if (direction == MixDirection.in) {
+                constraint.softness += (softness + (frames[frame + IkConstraintTimeline.SOFTNESS] - softness) * percent - constraint.softness) * alpha;
+                if (direction == MixDirection.mixIn) {
                     constraint.bendDirection = frames[frame + IkConstraintTimeline.PREV_BEND_DIRECTION];
                     constraint.compress = frames[frame + IkConstraintTimeline.PREV_COMPRESS] != 0;
                     constraint.stretch = frames[frame + IkConstraintTimeline.PREV_STRETCH] != 0;
                 }
             }
         };
-        IkConstraintTimeline.ENTRIES = 5;
-        IkConstraintTimeline.PREV_TIME = -5;
-        IkConstraintTimeline.PREV_MIX = -4;
+        IkConstraintTimeline.ENTRIES = 6;
+        IkConstraintTimeline.PREV_TIME = -6;
+        IkConstraintTimeline.PREV_MIX = -5;
+        IkConstraintTimeline.PREV_SOFTNESS = -4;
         IkConstraintTimeline.PREV_BEND_DIRECTION = -3;
         IkConstraintTimeline.PREV_COMPRESS = -2;
         IkConstraintTimeline.PREV_STRETCH = -1;
         IkConstraintTimeline.MIX = 1;
-        IkConstraintTimeline.BEND_DIRECTION = 2;
-        IkConstraintTimeline.COMPRESS = 3;
-        IkConstraintTimeline.STRETCH = 4;
+        IkConstraintTimeline.SOFTNESS = 2;
+        IkConstraintTimeline.BEND_DIRECTION = 3;
+        IkConstraintTimeline.COMPRESS = 4;
+        IkConstraintTimeline.STRETCH = 5;
         return IkConstraintTimeline;
     }(CurveTimeline));
     spine.IkConstraintTimeline = IkConstraintTimeline;
+    /** Changes a transform constraint's {@link TransformConstraint#rotateMix}, {@link TransformConstraint#translateMix},
+     * {@link TransformConstraint#scaleMix}, and {@link TransformConstraint#shearMix}. */
     var TransformConstraintTimeline = /** @class */ (function (_super) {
         __extends(TransformConstraintTimeline, _super);
         function TransformConstraintTimeline(frameCount) {
@@ -1132,7 +1258,7 @@ var spine;
         TransformConstraintTimeline.prototype.getPropertyId = function () {
             return (TimelineType.transformConstraint << 24) + this.transformConstraintIndex;
         };
-        /** Sets the time and mixes of the specified keyframe. */
+        /** The time in seconds, rotate mix, translate mix, scale mix, and shear mix for the specified key frame. */
         TransformConstraintTimeline.prototype.setFrame = function (frameIndex, time, rotateMix, translateMix, scaleMix, shearMix) {
             frameIndex *= TransformConstraintTimeline.ENTRIES;
             this.frames[frameIndex] = time;
@@ -1144,6 +1270,8 @@ var spine;
         TransformConstraintTimeline.prototype.apply = function (skeleton, lastTime, time, firedEvents, alpha, blend, direction) {
             var frames = this.frames;
             var constraint = skeleton.transformConstraints[this.transformConstraintIndex];
+            if (!constraint.active)
+                return;
             if (time < frames[0]) {
                 var data = constraint.data;
                 switch (blend) {
@@ -1210,6 +1338,7 @@ var spine;
         return TransformConstraintTimeline;
     }(CurveTimeline));
     spine.TransformConstraintTimeline = TransformConstraintTimeline;
+    /** Changes a path constraint's {@link PathConstraint#position}. */
     var PathConstraintPositionTimeline = /** @class */ (function (_super) {
         __extends(PathConstraintPositionTimeline, _super);
         function PathConstraintPositionTimeline(frameCount) {
@@ -1220,7 +1349,7 @@ var spine;
         PathConstraintPositionTimeline.prototype.getPropertyId = function () {
             return (TimelineType.pathConstraintPosition << 24) + this.pathConstraintIndex;
         };
-        /** Sets the time and value of the specified keyframe. */
+        /** Sets the time in seconds and path constraint position for the specified key frame. */
         PathConstraintPositionTimeline.prototype.setFrame = function (frameIndex, time, value) {
             frameIndex *= PathConstraintPositionTimeline.ENTRIES;
             this.frames[frameIndex] = time;
@@ -1229,6 +1358,8 @@ var spine;
         PathConstraintPositionTimeline.prototype.apply = function (skeleton, lastTime, time, firedEvents, alpha, blend, direction) {
             var frames = this.frames;
             var constraint = skeleton.pathConstraints[this.pathConstraintIndex];
+            if (!constraint.active)
+                return;
             if (time < frames[0]) {
                 switch (blend) {
                     case MixBlend.setup:
@@ -1262,6 +1393,7 @@ var spine;
         return PathConstraintPositionTimeline;
     }(CurveTimeline));
     spine.PathConstraintPositionTimeline = PathConstraintPositionTimeline;
+    /** Changes a path constraint's {@link PathConstraint#spacing}. */
     var PathConstraintSpacingTimeline = /** @class */ (function (_super) {
         __extends(PathConstraintSpacingTimeline, _super);
         function PathConstraintSpacingTimeline(frameCount) {
@@ -1273,6 +1405,8 @@ var spine;
         PathConstraintSpacingTimeline.prototype.apply = function (skeleton, lastTime, time, firedEvents, alpha, blend, direction) {
             var frames = this.frames;
             var constraint = skeleton.pathConstraints[this.pathConstraintIndex];
+            if (!constraint.active)
+                return;
             if (time < frames[0]) {
                 switch (blend) {
                     case MixBlend.setup:
@@ -1302,6 +1436,8 @@ var spine;
         return PathConstraintSpacingTimeline;
     }(PathConstraintPositionTimeline));
     spine.PathConstraintSpacingTimeline = PathConstraintSpacingTimeline;
+    /** Changes a transform constraint's {@link PathConstraint#rotateMix} and
+     * {@link TransformConstraint#translateMix}. */
     var PathConstraintMixTimeline = /** @class */ (function (_super) {
         __extends(PathConstraintMixTimeline, _super);
         function PathConstraintMixTimeline(frameCount) {
@@ -1312,7 +1448,7 @@ var spine;
         PathConstraintMixTimeline.prototype.getPropertyId = function () {
             return (TimelineType.pathConstraintMix << 24) + this.pathConstraintIndex;
         };
-        /** Sets the time and mixes of the specified keyframe. */
+        /** The time in seconds, rotate mix, and translate mix for the specified key frame. */
         PathConstraintMixTimeline.prototype.setFrame = function (frameIndex, time, rotateMix, translateMix) {
             frameIndex *= PathConstraintMixTimeline.ENTRIES;
             this.frames[frameIndex] = time;
@@ -1322,6 +1458,8 @@ var spine;
         PathConstraintMixTimeline.prototype.apply = function (skeleton, lastTime, time, firedEvents, alpha, blend, direction) {
             var frames = this.frames;
             var constraint = skeleton.pathConstraints[this.pathConstraintIndex];
+            if (!constraint.active)
+                return;
             if (time < frames[0]) {
                 switch (blend) {
                     case MixBlend.setup:
@@ -1370,9 +1508,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -1385,31 +1523,70 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Applies animations over time, queues animations for later playback, mixes (crossfading) between animations, and applies
+     * multiple animations on top of each other (layering).
+     *
+     * See [Applying Animations](http://esotericsoftware.com/spine-applying-animations/) in the Spine Runtimes Guide. */
     var AnimationState = /** @class */ (function () {
         function AnimationState(data) {
+            /** The list of tracks that currently have animations, which may contain null entries. */
             this.tracks = new Array();
+            /** Multiplier for the delta time when the animation state is updated, causing time for all animations and mixes to play slower
+             * or faster. Defaults to 1.
+             *
+             * See TrackEntry {@link TrackEntry#timeScale} for affecting a single animation. */
+            this.timeScale = 1;
+            this.unkeyedState = 0;
             this.events = new Array();
             this.listeners = new Array();
             this.queue = new EventQueue(this);
             this.propertyIDs = new spine.IntSet();
             this.animationsChanged = false;
-            this.timeScale = 1;
             this.trackEntryPool = new spine.Pool(function () { return new TrackEntry(); });
             this.data = data;
         }
+        /** Increments each track entry {@link TrackEntry#trackTime()}, setting queued animations as current if needed. */
         AnimationState.prototype.update = function (delta) {
             delta *= this.timeScale;
             var tracks = this.tracks;
@@ -1433,7 +1610,7 @@ var spine;
                     var nextTime = current.trackLast - next.delay;
                     if (nextTime >= 0) {
                         next.delay = 0;
-                        next.trackTime = current.timeScale == 0 ? 0 : (nextTime / current.timeScale + delta) * next.timeScale;
+                        next.trackTime += current.timeScale == 0 ? 0 : (nextTime / current.timeScale + delta) * next.timeScale;
                         current.trackTime += currentDelta;
                         this.setCurrent(i, next, true);
                         while (next.mixingFrom != null) {
@@ -1464,6 +1641,7 @@ var spine;
             }
             this.queue.drain();
         };
+        /** Returns true when all mixing from entries are complete. */
         AnimationState.prototype.updateMixingFrom = function (to, delta) {
             var from = to.mixingFrom;
             if (from == null)
@@ -1487,6 +1665,9 @@ var spine;
             to.mixTime += delta;
             return false;
         };
+        /** Poses the skeleton using the track entry animations. There are no side effects other than invoking listeners, so the
+         * animation state can be applied to multiple skeletons to pose them identically.
+         * @returns True if any animations were applied. */
         AnimationState.prototype.apply = function (skeleton) {
             if (skeleton == null)
                 throw new Error("skeleton cannot be null.");
@@ -1495,12 +1676,12 @@ var spine;
             var events = this.events;
             var tracks = this.tracks;
             var applied = false;
-            for (var i = 0, n = tracks.length; i < n; i++) {
-                var current = tracks[i];
+            for (var i_16 = 0, n_1 = tracks.length; i_16 < n_1; i_16++) {
+                var current = tracks[i_16];
                 if (current == null || current.delay > 0)
                     continue;
                 applied = true;
-                var blend = i == 0 ? spine.MixBlend.first : current.mixBlend;
+                var blend = i_16 == 0 ? spine.MixBlend.first : current.mixBlend;
                 // Apply mixing from entries first.
                 var mix = current.alpha;
                 if (current.mixingFrom != null)
@@ -1511,9 +1692,18 @@ var spine;
                 var animationLast = current.animationLast, animationTime = current.getAnimationTime();
                 var timelineCount = current.animation.timelines.length;
                 var timelines = current.animation.timelines;
-                if ((i == 0 && mix == 1) || blend == spine.MixBlend.add) {
-                    for (var ii = 0; ii < timelineCount; ii++)
-                        timelines[ii].apply(skeleton, animationLast, animationTime, events, mix, blend, spine.MixDirection.in);
+                if ((i_16 == 0 && mix == 1) || blend == spine.MixBlend.add) {
+                    for (var ii = 0; ii < timelineCount; ii++) {
+                        // Fixes issue #302 on IOS9 where mix, blend sometimes became undefined and caused assets
+                        // to sometimes stop rendering when using color correction, as their RGBA values become NaN.
+                        // (https://github.com/pixijs/pixi-spine/issues/302)
+                        spine.Utils.webkit602BugfixHelper(mix, blend);
+                        var timeline = timelines[ii];
+                        if (timeline instanceof spine.AttachmentTimeline)
+                            this.applyAttachmentTimeline(timeline, skeleton, animationTime, blend, true);
+                        else
+                            timeline.apply(skeleton, animationLast, animationTime, events, mix, blend, spine.MixDirection.mixIn);
+                    }
                 }
                 else {
                     var timelineMode = current.timelineMode;
@@ -1522,15 +1712,18 @@ var spine;
                         spine.Utils.setArraySize(current.timelinesRotation, timelineCount << 1, null);
                     var timelinesRotation = current.timelinesRotation;
                     for (var ii = 0; ii < timelineCount; ii++) {
-                        var timeline = timelines[ii];
+                        var timeline_1 = timelines[ii];
                         var timelineBlend = timelineMode[ii] == AnimationState.SUBSEQUENT ? blend : spine.MixBlend.setup;
-                        if (timeline instanceof spine.RotateTimeline) {
-                            this.applyRotateTimeline(timeline, skeleton, animationTime, mix, timelineBlend, timelinesRotation, ii << 1, firstFrame);
+                        if (timeline_1 instanceof spine.RotateTimeline) {
+                            this.applyRotateTimeline(timeline_1, skeleton, animationTime, mix, timelineBlend, timelinesRotation, ii << 1, firstFrame);
+                        }
+                        else if (timeline_1 instanceof spine.AttachmentTimeline) {
+                            this.applyAttachmentTimeline(timeline_1, skeleton, animationTime, blend, true);
                         }
                         else {
                             // This fixes the WebKit 602 specific issue described at http://esotericsoftware.com/forum/iOS-10-disappearing-graphics-10109
                             spine.Utils.webkit602BugfixHelper(mix, blend);
-                            timeline.apply(skeleton, animationLast, animationTime, events, mix, timelineBlend, spine.MixDirection.in);
+                            timeline_1.apply(skeleton, animationLast, animationTime, events, mix, timelineBlend, spine.MixDirection.mixIn);
                         }
                     }
                 }
@@ -1539,6 +1732,19 @@ var spine;
                 current.nextAnimationLast = animationTime;
                 current.nextTrackLast = current.trackTime;
             }
+            // Set slots attachments to the setup pose, if needed. This occurs if an animation that is mixing out sets attachments so
+            // subsequent timelines see any deform, but the subsequent timelines don't set an attachment (eg they are also mixing out or
+            // the time is before the first key).
+            var setupState = this.unkeyedState + AnimationState.SETUP;
+            var slots = skeleton.slots;
+            for (var i = 0, n = skeleton.slots.length; i < n; i++) {
+                var slot = slots[i];
+                if (slot.attachmentState == setupState) {
+                    var attachmentName = slot.data.attachmentName;
+                    slot.attachment = (attachmentName == null ? null : skeleton.getAttachment(slot.data.index, attachmentName));
+                }
+            }
+            this.unkeyedState += 2; // Increasing after each use avoids the need to reset attachmentState for every slot.
             this.queue.drain();
             return applied;
         };
@@ -1567,7 +1773,7 @@ var spine;
             var alphaHold = from.alpha * to.interruptAlpha, alphaMix = alphaHold * (1 - mix);
             if (blend == spine.MixBlend.add) {
                 for (var i = 0; i < timelineCount; i++)
-                    timelines[i].apply(skeleton, animationLast, animationTime, events, alphaMix, blend, spine.MixDirection.out);
+                    timelines[i].apply(skeleton, animationLast, animationTime, events, alphaMix, blend, spine.MixDirection.mixOut);
             }
             else {
                 var timelineMode = from.timelineMode;
@@ -1579,13 +1785,11 @@ var spine;
                 from.totalAlpha = 0;
                 for (var i = 0; i < timelineCount; i++) {
                     var timeline = timelines[i];
-                    var direction = spine.MixDirection.out;
+                    var direction = spine.MixDirection.mixOut;
                     var timelineBlend = void 0;
                     var alpha = 0;
                     switch (timelineMode[i]) {
                         case AnimationState.SUBSEQUENT:
-                            if (!attachments && timeline instanceof spine.AttachmentTimeline)
-                                continue;
                             if (!drawOrder && timeline instanceof spine.DrawOrderTimeline)
                                 continue;
                             timelineBlend = blend;
@@ -1608,19 +1812,13 @@ var spine;
                     from.totalAlpha += alpha;
                     if (timeline instanceof spine.RotateTimeline)
                         this.applyRotateTimeline(timeline, skeleton, animationTime, alpha, timelineBlend, timelinesRotation, i << 1, firstFrame);
+                    else if (timeline instanceof spine.AttachmentTimeline)
+                        this.applyAttachmentTimeline(timeline, skeleton, animationTime, timelineBlend, attachments);
                     else {
                         // This fixes the WebKit 602 specific issue described at http://esotericsoftware.com/forum/iOS-10-disappearing-graphics-10109
                         spine.Utils.webkit602BugfixHelper(alpha, blend);
-                        if (timelineBlend == spine.MixBlend.setup) {
-                            if (timeline instanceof spine.AttachmentTimeline) {
-                                if (attachments)
-                                    direction = spine.MixDirection.out;
-                            }
-                            else if (timeline instanceof spine.DrawOrderTimeline) {
-                                if (drawOrder)
-                                    direction = spine.MixDirection.out;
-                            }
-                        }
+                        if (drawOrder && timeline instanceof spine.DrawOrderTimeline && timelineBlend == spine.MixBlend.setup)
+                            direction = spine.MixDirection.mixIn;
                         timeline.apply(skeleton, animationLast, animationTime, events, alpha, timelineBlend, direction);
                     }
                 }
@@ -1632,16 +1830,44 @@ var spine;
             from.nextTrackLast = from.trackTime;
             return mix;
         };
+        AnimationState.prototype.applyAttachmentTimeline = function (timeline, skeleton, time, blend, attachments) {
+            var slot = skeleton.slots[timeline.slotIndex];
+            if (!slot.bone.active)
+                return;
+            var frames = timeline.frames;
+            if (time < frames[0]) { // Time is before first frame.
+                if (blend == spine.MixBlend.setup || blend == spine.MixBlend.first)
+                    this.setAttachment(skeleton, slot, slot.data.attachmentName, attachments);
+            }
+            else {
+                var frameIndex;
+                if (time >= frames[frames.length - 1]) // Time is after last frame.
+                    frameIndex = frames.length - 1;
+                else
+                    frameIndex = spine.Animation.binarySearch(frames, time) - 1;
+                this.setAttachment(skeleton, slot, timeline.attachmentNames[frameIndex], attachments);
+            }
+            // If an attachment wasn't set (ie before the first frame or attachments is false), set the setup attachment later.
+            if (slot.attachmentState <= this.unkeyedState)
+                slot.attachmentState = this.unkeyedState + AnimationState.SETUP;
+        };
+        AnimationState.prototype.setAttachment = function (skeleton, slot, attachmentName, attachments) {
+            slot.attachment = attachmentName == null ? null : skeleton.getAttachment(slot.data.index, attachmentName);
+            if (attachments)
+                slot.attachmentState = this.unkeyedState + AnimationState.CURRENT;
+        };
         AnimationState.prototype.applyRotateTimeline = function (timeline, skeleton, time, alpha, blend, timelinesRotation, i, firstFrame) {
             if (firstFrame)
                 timelinesRotation[i] = 0;
             if (alpha == 1) {
-                timeline.apply(skeleton, 0, time, null, 1, blend, spine.MixDirection.in);
+                timeline.apply(skeleton, 0, time, null, 1, blend, spine.MixDirection.mixIn);
                 return;
             }
             var rotateTimeline = timeline;
             var frames = rotateTimeline.frames;
             var bone = skeleton.bones[rotateTimeline.boneIndex];
+            if (!bone.active)
+                return;
             var r1 = 0, r2 = 0;
             if (time < frames[0]) {
                 switch (blend) {
@@ -1734,6 +1960,10 @@ var spine;
                 this.queue.event(entry, events[i]);
             }
         };
+        /** Removes all animations from all tracks, leaving skeletons in their current pose.
+         *
+         * It may be desired to use {@link AnimationState#setEmptyAnimation()} to mix the skeletons back to the setup pose,
+         * rather than leaving them in their current pose. */
         AnimationState.prototype.clearTracks = function () {
             var oldDrainDisabled = this.queue.drainDisabled;
             this.queue.drainDisabled = true;
@@ -1743,6 +1973,10 @@ var spine;
             this.queue.drainDisabled = oldDrainDisabled;
             this.queue.drain();
         };
+        /** Removes all animations from the track, leaving skeletons in their current pose.
+         *
+         * It may be desired to use {@link AnimationState#setEmptyAnimation()} to mix the skeletons back to the setup pose,
+         * rather than leaving them in their current pose. */
         AnimationState.prototype.clearTrack = function (trackIndex) {
             if (trackIndex >= this.tracks.length)
                 return;
@@ -1780,12 +2014,21 @@ var spine;
             }
             this.queue.start(current);
         };
+        /** Sets an animation by name.
+        *
+        * {@link #setAnimationWith(}. */
         AnimationState.prototype.setAnimation = function (trackIndex, animationName, loop) {
             var animation = this.data.skeletonData.findAnimation(animationName);
             if (animation == null)
                 throw new Error("Animation not found: " + animationName);
             return this.setAnimationWith(trackIndex, animation, loop);
         };
+        /** Sets the current animation for a track, discarding any queued animations. If the formerly current track entry was never
+         * applied to a skeleton, it is replaced (not mixed from).
+         * @param loop If true, the animation will repeat. If false it will not, instead its last frame is applied if played beyond its
+         *           duration. In either case {@link TrackEntry#trackEnd} determines when the track is cleared.
+         * @returns A track entry to allow further customization of animation playback. References to the track entry must not be kept
+         *         after the {@link AnimationStateListener#dispose()} event occurs. */
         AnimationState.prototype.setAnimationWith = function (trackIndex, animation, loop) {
             if (animation == null)
                 throw new Error("animation cannot be null.");
@@ -1809,12 +2052,23 @@ var spine;
             this.queue.drain();
             return entry;
         };
+        /** Queues an animation by name.
+         *
+         * See {@link #addAnimationWith()}. */
         AnimationState.prototype.addAnimation = function (trackIndex, animationName, loop, delay) {
             var animation = this.data.skeletonData.findAnimation(animationName);
             if (animation == null)
                 throw new Error("Animation not found: " + animationName);
             return this.addAnimationWith(trackIndex, animation, loop, delay);
         };
+        /** Adds an animation to be played after the current or last queued animation for a track. If the track is empty, it is
+         * equivalent to calling {@link #setAnimationWith()}.
+         * @param delay If > 0, sets {@link TrackEntry#delay}. If <= 0, the delay set is the duration of the previous track entry
+         *           minus any mix duration (from the {@link AnimationStateData}) plus the specified `delay` (ie the mix
+         *           ends at (`delay` = 0) or before (`delay` < 0) the previous track entry duration). If the
+         *           previous entry is looping, its next loop completion is used instead of its duration.
+         * @returns A track entry to allow further customization of animation playback. References to the track entry must not be kept
+         *         after the {@link AnimationStateListener#dispose()} event occurs. */
         AnimationState.prototype.addAnimationWith = function (trackIndex, animation, loop, delay) {
             if (animation == null)
                 throw new Error("animation cannot be null.");
@@ -1846,12 +2100,37 @@ var spine;
             entry.delay = delay;
             return entry;
         };
+        /** Sets an empty animation for a track, discarding any queued animations, and sets the track entry's
+         * {@link TrackEntry#mixduration}. An empty animation has no timelines and serves as a placeholder for mixing in or out.
+         *
+         * Mixing out is done by setting an empty animation with a mix duration using either {@link #setEmptyAnimation()},
+         * {@link #setEmptyAnimations()}, or {@link #addEmptyAnimation()}. Mixing to an empty animation causes
+         * the previous animation to be applied less and less over the mix duration. Properties keyed in the previous animation
+         * transition to the value from lower tracks or to the setup pose value if no lower tracks key the property. A mix duration of
+         * 0 still mixes out over one frame.
+         *
+         * Mixing in is done by first setting an empty animation, then adding an animation using
+         * {@link #addAnimation()} and on the returned track entry, set the
+         * {@link TrackEntry#setMixDuration()}. Mixing from an empty animation causes the new animation to be applied more and
+         * more over the mix duration. Properties keyed in the new animation transition from the value from lower tracks or from the
+         * setup pose value if no lower tracks key the property to the value keyed in the new animation. */
         AnimationState.prototype.setEmptyAnimation = function (trackIndex, mixDuration) {
             var entry = this.setAnimationWith(trackIndex, AnimationState.emptyAnimation, false);
             entry.mixDuration = mixDuration;
             entry.trackEnd = mixDuration;
             return entry;
         };
+        /** Adds an empty animation to be played after the current or last queued animation for a track, and sets the track entry's
+         * {@link TrackEntry#mixDuration}. If the track is empty, it is equivalent to calling
+         * {@link #setEmptyAnimation()}.
+         *
+         * See {@link #setEmptyAnimation()}.
+         * @param delay If > 0, sets {@link TrackEntry#delay}. If <= 0, the delay set is the duration of the previous track entry
+         *           minus any mix duration plus the specified `delay` (ie the mix ends at (`delay` = 0) or
+         *           before (`delay` < 0) the previous track entry duration). If the previous entry is looping, its next
+         *           loop completion is used instead of its duration.
+         * @return A track entry to allow further customization of animation playback. References to the track entry must not be kept
+         *         after the {@link AnimationStateListener#dispose()} event occurs. */
         AnimationState.prototype.addEmptyAnimation = function (trackIndex, mixDuration, delay) {
             if (delay <= 0)
                 delay -= mixDuration;
@@ -1860,6 +2139,8 @@ var spine;
             entry.trackEnd = mixDuration;
             return entry;
         };
+        /** Sets an empty animation for every track, discarding any queued animations, and mixes to it over the specified mix
+        * duration. */
         AnimationState.prototype.setEmptyAnimations = function (mixDuration) {
             var oldDrainDisabled = this.queue.drainDisabled;
             this.queue.drainDisabled = true;
@@ -1874,10 +2155,11 @@ var spine;
         AnimationState.prototype.expandToIndex = function (index) {
             if (index < this.tracks.length)
                 return this.tracks[index];
-            spine.Utils.ensureArrayCapacity(this.tracks, index - this.tracks.length + 1, null);
+            spine.Utils.ensureArrayCapacity(this.tracks, index + 1, null);
             this.tracks.length = index + 1;
             return null;
         };
+        /** @param last May be null. */
         AnimationState.prototype.trackEntry = function (trackIndex, animation, loop, last) {
             var entry = this.trackEntryPool.obtain();
             entry.trackIndex = trackIndex;
@@ -1901,6 +2183,7 @@ var spine;
             entry.interruptAlpha = 1;
             entry.mixTime = 0;
             entry.mixDuration = last == null ? 0 : this.data.getMix(last.animation, animation);
+            entry.mixBlend = spine.MixBlend.replace;
             return entry;
         };
         AnimationState.prototype.disposeNext = function (entry) {
@@ -1922,12 +2205,12 @@ var spine;
                     entry = entry.mixingFrom;
                 do {
                     if (entry.mixingFrom == null || entry.mixBlend != spine.MixBlend.add)
-                        this.setTimelineModes(entry);
+                        this.computeHold(entry);
                     entry = entry.mixingTo;
                 } while (entry != null);
             }
         };
-        AnimationState.prototype.setTimelineModes = function (entry) {
+        AnimationState.prototype.computeHold = function (entry) {
             var to = entry.mixingTo;
             var timelines = entry.animation.timelines;
             var timelinesCount = entry.animation.timelines.length;
@@ -1943,14 +2226,17 @@ var spine;
                 return;
             }
             outer: for (var i = 0; i < timelinesCount; i++) {
-                var id = timelines[i].getPropertyId();
+                var timeline = timelines[i];
+                var id = timeline.getPropertyId();
                 if (!propertyIDs.add(id))
                     timelineMode[i] = AnimationState.SUBSEQUENT;
-                else if (to == null || !this.hasTimeline(to, id))
+                else if (to == null || timeline instanceof spine.AttachmentTimeline || timeline instanceof spine.DrawOrderTimeline
+                    || timeline instanceof spine.EventTimeline || !to.animation.hasTimeline(id)) {
                     timelineMode[i] = AnimationState.FIRST;
+                }
                 else {
                     for (var next = to.mixingTo; next != null; next = next.mixingTo) {
-                        if (this.hasTimeline(next, id))
+                        if (next.animation.hasTimeline(id))
                             continue;
                         if (entry.mixDuration > 0) {
                             timelineMode[i] = AnimationState.HOLD_MIX;
@@ -1963,45 +2249,80 @@ var spine;
                 }
             }
         };
-        AnimationState.prototype.hasTimeline = function (entry, id) {
-            var timelines = entry.animation.timelines;
-            for (var i = 0, n = timelines.length; i < n; i++)
-                if (timelines[i].getPropertyId() == id)
-                    return true;
-            return false;
-        };
+        /** Returns the track entry for the animation currently playing on the track, or null if no animation is currently playing. */
         AnimationState.prototype.getCurrent = function (trackIndex) {
             if (trackIndex >= this.tracks.length)
                 return null;
             return this.tracks[trackIndex];
         };
+        /** Adds a listener to receive events for all track entries. */
         AnimationState.prototype.addListener = function (listener) {
             if (listener == null)
                 throw new Error("listener cannot be null.");
             this.listeners.push(listener);
         };
-        /** Removes the listener added with {@link #addListener(AnimationStateListener)}. */
+        /** Removes the listener added with {@link #addListener()}. */
         AnimationState.prototype.removeListener = function (listener) {
             var index = this.listeners.indexOf(listener);
             if (index >= 0)
                 this.listeners.splice(index, 1);
         };
+        /** Removes all listeners added with {@link #addListener()}. */
         AnimationState.prototype.clearListeners = function () {
             this.listeners.length = 0;
         };
+        /** Discards all listener notifications that have not yet been delivered. This can be useful to call from an
+         * {@link AnimationStateListener} when it is known that further notifications that may have been already queued for delivery
+         * are not wanted because new animations are being set. */
         AnimationState.prototype.clearListenerNotifications = function () {
             this.queue.clear();
         };
         AnimationState.emptyAnimation = new spine.Animation("<empty>", [], 0);
+        /** 1. A previously applied timeline has set this property.
+         *
+         * Result: Mix from the current pose to the timeline pose. */
         AnimationState.SUBSEQUENT = 0;
+        /** 1. This is the first timeline to set this property.
+         * 2. The next track entry applied after this one does not have a timeline to set this property.
+         *
+         * Result: Mix from the setup pose to the timeline pose. */
         AnimationState.FIRST = 1;
+        /** 1. This is the first timeline to set this property.
+         * 2. The next track entry to be applied does have a timeline to set this property.
+         * 3. The next track entry after that one does not have a timeline to set this property.
+         *
+         * Result: Mix from the setup pose to the timeline pose, but do not mix out. This avoids "dipping" when crossfading animations
+         * that key the same property. A subsequent timeline will set this property using a mix. */
         AnimationState.HOLD = 2;
+        /** 1. This is the first timeline to set this property.
+         * 2. The next track entry to be applied does have a timeline to set this property.
+         * 3. The next track entry after that one does have a timeline to set this property.
+         * 4. timelineHoldMix stores the first subsequent track entry that does not have a timeline to set this property.
+         *
+         * Result: The same as HOLD except the mix percentage from the timelineHoldMix track entry is used. This handles when more than
+         * 2 track entries in a row have a timeline that sets the same property.
+         *
+         * Eg, A -> B -> C -> D where A, B, and C have a timeline setting same property, but D does not. When A is applied, to avoid
+         * "dipping" A is not mixed out, however D (the first entry that doesn't set the property) mixing in is used to mix out A
+         * (which affects B and C). Without using D to mix out, A would be applied fully until mixing completes, then snap into
+         * place. */
         AnimationState.HOLD_MIX = 3;
+        AnimationState.SETUP = 1;
+        AnimationState.CURRENT = 2;
         return AnimationState;
     }());
     spine.AnimationState = AnimationState;
+    /** Stores settings and other state for the playback of an animation on an {@link AnimationState} track.
+     *
+     * References to a track entry must not be kept after the {@link AnimationStateListener#dispose()} event occurs. */
     var TrackEntry = /** @class */ (function () {
         function TrackEntry() {
+            /** Controls how properties keyed in the animation are mixed with lower tracks. Defaults to {@link MixBlend#replace}, which
+             * replaces the values from the lower tracks with the animation values. {@link MixBlend#add} adds the animation values to
+             * the values from the lower tracks.
+             *
+             * The `mixBlend` can be set for a new track entry only before {@link AnimationState#apply()} is first
+             * called. */
             this.mixBlend = spine.MixBlend.replace;
             this.timelineMode = new Array();
             this.timelineHoldMix = new Array();
@@ -2017,6 +2338,9 @@ var spine;
             this.timelineHoldMix.length = 0;
             this.timelinesRotation.length = 0;
         };
+        /** Uses {@link #trackTime} to compute the `animationTime`, which is between {@link #animationStart}
+         * and {@link #animationEnd}. When the `trackTime` is 0, the `animationTime` is equal to the
+         * `animationStart` time. */
         TrackEntry.prototype.getAnimationTime = function () {
             if (this.loop) {
                 var duration = this.animationEnd - this.animationStart;
@@ -2030,9 +2354,19 @@ var spine;
             this.animationLast = animationLast;
             this.nextAnimationLast = animationLast;
         };
+        /** Returns true if at least one loop has been completed.
+         *
+         * See {@link AnimationStateListener#complete()}. */
         TrackEntry.prototype.isComplete = function () {
             return this.trackTime >= this.animationEnd - this.animationStart;
         };
+        /** Resets the rotation directions for mixing this entry's rotate timelines. This can be useful to avoid bones rotating the
+         * long way around when using {@link #alpha} and starting animations on other tracks.
+         *
+         * Mixing with {@link MixBlend#replace} involves finding a rotation between two others, which has two possible solutions:
+         * the short way or the long way around. The two rotations likely change over time, so which direction is the short or long
+         * way also changes. If the short way was always chosen, bones would flip to the other side when that direction became the
+         * long way. TrackEntry chooses the short way the first time it is applied and remembers that direction. */
         TrackEntry.prototype.resetRotationDirections = function () {
             this.timelinesRotation.length = 0;
         };
@@ -2146,30 +2480,30 @@ var spine;
         EventType[EventType["complete"] = 4] = "complete";
         EventType[EventType["event"] = 5] = "event";
     })(EventType = spine.EventType || (spine.EventType = {}));
-    var AnimationStateAdapter2 = /** @class */ (function () {
-        function AnimationStateAdapter2() {
+    var AnimationStateAdapter = /** @class */ (function () {
+        function AnimationStateAdapter() {
         }
-        AnimationStateAdapter2.prototype.start = function (entry) {
+        AnimationStateAdapter.prototype.start = function (entry) {
         };
-        AnimationStateAdapter2.prototype.interrupt = function (entry) {
+        AnimationStateAdapter.prototype.interrupt = function (entry) {
         };
-        AnimationStateAdapter2.prototype.end = function (entry) {
+        AnimationStateAdapter.prototype.end = function (entry) {
         };
-        AnimationStateAdapter2.prototype.dispose = function (entry) {
+        AnimationStateAdapter.prototype.dispose = function (entry) {
         };
-        AnimationStateAdapter2.prototype.complete = function (entry) {
+        AnimationStateAdapter.prototype.complete = function (entry) {
         };
-        AnimationStateAdapter2.prototype.event = function (entry, event) {
+        AnimationStateAdapter.prototype.event = function (entry, event) {
         };
-        return AnimationStateAdapter2;
+        return AnimationStateAdapter;
     }());
-    spine.AnimationStateAdapter2 = AnimationStateAdapter2;
+    spine.AnimationStateAdapter = AnimationStateAdapter;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -2182,27 +2516,60 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Stores mix (crossfade) durations to be applied when {@link AnimationState} animations are changed. */
     var AnimationStateData = /** @class */ (function () {
         function AnimationStateData(skeletonData) {
             this.animationToMixTime = {};
+            /** The mix duration to use when no mix duration has been defined between two animations. */
             this.defaultMix = 0;
             if (skeletonData == null)
                 throw new Error("skeletonData cannot be null.");
             this.skeletonData = skeletonData;
         }
+        /** Sets a mix duration by animation name.
+         *
+         * See {@link #setMixWith()}. */
         AnimationStateData.prototype.setMix = function (fromName, toName, duration) {
             var from = this.skeletonData.findAnimation(fromName);
             if (from == null)
@@ -2212,6 +2579,9 @@ var spine;
                 throw new Error("Animation not found: " + toName);
             this.setMixWith(from, to, duration);
         };
+        /** Sets the mix duration when changing from the specified animation to the other.
+         *
+         * See {@link TrackEntry#mixDuration}. */
         AnimationStateData.prototype.setMixWith = function (from, to, duration) {
             if (from == null)
                 throw new Error("from cannot be null.");
@@ -2220,6 +2590,8 @@ var spine;
             var key = from.name + "." + to.name;
             this.animationToMixTime[key] = duration;
         };
+        /** Returns the mix duration to use when changing from the specified animation to the other, or the {@link #defaultMix} if
+        * no mix duration has been set. */
         AnimationStateData.prototype.getMix = function (from, to) {
             var key = from.name + "." + to.name;
             var value = this.animationToMixTime[key];
@@ -2231,9 +2603,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -2246,18 +2618,46 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
     var AssetManager = /** @class */ (function () {
         function AssetManager(textureLoader, pathPrefix) {
@@ -2266,11 +2666,15 @@ var spine;
             this.errors = {};
             this.toLoad = 0;
             this.loaded = 0;
+            this.rawDataUris = {};
             this.textureLoader = textureLoader;
             this.pathPrefix = pathPrefix;
         }
-        AssetManager.downloadText = function (url, success, error) {
+        AssetManager.prototype.downloadText = function (url, success, error) {
             var request = new XMLHttpRequest();
+            request.overrideMimeType("text/html");
+            if (this.rawDataUris[url])
+                url = this.rawDataUris[url];
             request.open("GET", url, true);
             request.onload = function () {
                 if (request.status == 200) {
@@ -2285,8 +2689,10 @@ var spine;
             };
             request.send();
         };
-        AssetManager.downloadBinary = function (url, success, error) {
+        AssetManager.prototype.downloadBinary = function (url, success, error) {
             var request = new XMLHttpRequest();
+            if (this.rawDataUris[url])
+                url = this.rawDataUris[url];
             request.open("GET", url, true);
             request.responseType = "arraybuffer";
             request.onload = function () {
@@ -2302,13 +2708,36 @@ var spine;
             };
             request.send();
         };
+        AssetManager.prototype.setRawDataURI = function (path, data) {
+            this.rawDataUris[this.pathPrefix + path] = data;
+        };
+        AssetManager.prototype.loadBinary = function (path, success, error) {
+            var _this = this;
+            if (success === void 0) { success = null; }
+            if (error === void 0) { error = null; }
+            path = this.pathPrefix + path;
+            this.toLoad++;
+            this.downloadBinary(path, function (data) {
+                _this.assets[path] = data;
+                if (success)
+                    success(path, data);
+                _this.toLoad--;
+                _this.loaded++;
+            }, function (state, responseText) {
+                _this.errors[path] = "Couldn't load binary " + path + ": status " + status + ", " + responseText;
+                if (error)
+                    error(path, "Couldn't load binary " + path + ": status " + status + ", " + responseText);
+                _this.toLoad--;
+                _this.loaded++;
+            });
+        };
         AssetManager.prototype.loadText = function (path, success, error) {
             var _this = this;
             if (success === void 0) { success = null; }
             if (error === void 0) { error = null; }
             path = this.pathPrefix + path;
             this.toLoad++;
-            AssetManager.downloadText(path, function (data) {
+            this.downloadText(path, function (data) {
                 _this.assets[path] = data;
                 if (success)
                     success(path, data);
@@ -2327,12 +2756,13 @@ var spine;
             if (success === void 0) { success = null; }
             if (error === void 0) { error = null; }
             path = this.pathPrefix + path;
+            var storagePath = path;
             this.toLoad++;
             var img = new Image();
             img.crossOrigin = "anonymous";
             img.onload = function (ev) {
                 var texture = _this.textureLoader(img);
-                _this.assets[path] = texture;
+                _this.assets[storagePath] = texture;
                 _this.toLoad--;
                 _this.loaded++;
                 if (success)
@@ -2345,31 +2775,9 @@ var spine;
                 if (error)
                     error(path, "Couldn't load image " + path);
             };
+            if (this.rawDataUris[path])
+                path = this.rawDataUris[path];
             img.src = path;
-        };
-        AssetManager.prototype.loadTextureData = function (path, data, success, error) {
-            var _this = this;
-            if (success === void 0) { success = null; }
-            if (error === void 0) { error = null; }
-            path = this.pathPrefix + path;
-            this.toLoad++;
-            var img = new Image();
-            img.onload = function (ev) {
-                var texture = _this.textureLoader(img);
-                _this.assets[path] = texture;
-                _this.toLoad--;
-                _this.loaded++;
-                if (success)
-                    success(path, img);
-            };
-            img.onerror = function (ev) {
-                _this.errors[path] = "Couldn't load image " + path;
-                _this.toLoad--;
-                _this.loaded++;
-                if (error)
-                    error(path, "Couldn't load image " + path);
-            };
-            img.src = data;
         };
         AssetManager.prototype.loadTextureAtlas = function (path, success, error) {
             var _this = this;
@@ -2378,12 +2786,12 @@ var spine;
             var parent = path.lastIndexOf("/") >= 0 ? path.substring(0, path.lastIndexOf("/")) : "";
             path = this.pathPrefix + path;
             this.toLoad++;
-            AssetManager.downloadText(path, function (atlasData) {
+            this.downloadText(path, function (atlasData) {
                 var pagesLoaded = { count: 0 };
                 var atlasPages = new Array();
                 try {
                     var atlas = new spine.TextureAtlas(atlasData, function (path) {
-                        atlasPages.push(parent + "/" + path);
+                        atlasPages.push(parent == "" ? path : parent + "/" + path);
                         var image = document.createElement("img");
                         image.width = 16;
                         image.height = 16;
@@ -2407,7 +2815,7 @@ var spine;
                             if (!pageLoadError) {
                                 try {
                                     var atlas = new spine.TextureAtlas(atlasData, function (path) {
-                                        return _this.get(parent + "/" + path);
+                                        return _this.get(parent == "" ? path : parent + "/" + path);
                                     });
                                     _this.assets[path] = atlas;
                                     if (success)
@@ -2499,9 +2907,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -2514,24 +2922,55 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** An {@link AttachmentLoader} that configures attachments using texture regions from an {@link TextureAtlas}.
+     *
+     * See [Loading skeleton data](http://esotericsoftware.com/spine-loading-skeleton-data#JSON-and-binary-data) in the
+     * Spine Runtimes Guide. */
     var AtlasAttachmentLoader = /** @class */ (function () {
         function AtlasAttachmentLoader(atlas) {
             this.atlas = atlas;
         }
-        /** @return May be null to not load an attachment. */
         AtlasAttachmentLoader.prototype.newRegionAttachment = function (skin, name, path) {
             var region = this.atlas.findRegion(path);
             if (region == null)
@@ -2541,7 +2980,6 @@ var spine;
             attachment.setRegion(region);
             return attachment;
         };
-        /** @return May be null to not load an attachment. */
         AtlasAttachmentLoader.prototype.newMeshAttachment = function (skin, name, path) {
             var region = this.atlas.findRegion(path);
             if (region == null)
@@ -2551,11 +2989,9 @@ var spine;
             attachment.region = region;
             return attachment;
         };
-        /** @return May be null to not load an attachment. */
         AtlasAttachmentLoader.prototype.newBoundingBoxAttachment = function (skin, name) {
             return new spine.BoundingBoxAttachment(name);
         };
-        /** @return May be null to not load an attachment */
         AtlasAttachmentLoader.prototype.newPathAttachment = function (skin, name) {
             return new spine.PathAttachment(name);
         };
@@ -2571,9 +3007,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -2586,19 +3022,48 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Determines how images are blended with existing pixels when drawn. */
     var BlendMode;
     (function (BlendMode) {
         BlendMode[BlendMode["Normal"] = 0] = "Normal";
@@ -2609,9 +3074,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -2624,45 +3089,102 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Stores a bone's current pose.
+     *
+     * A bone has a local transform which is used to compute its world transform. A bone also has an applied transform, which is a
+     * local transform that can be applied to compute the world transform. The local transform and applied transform may differ if a
+     * constraint or application code modifies the world transform after it was computed from the local transform. */
     var Bone = /** @class */ (function () {
         /** @param parent May be null. */
         function Bone(data, skeleton, parent) {
+            /** The immediate children of this bone. */
             this.children = new Array();
+            /** The local x translation. */
             this.x = 0;
+            /** The local y translation. */
             this.y = 0;
+            /** The local rotation in degrees, counter clockwise. */
             this.rotation = 0;
+            /** The local scaleX. */
             this.scaleX = 0;
+            /** The local scaleY. */
             this.scaleY = 0;
+            /** The local shearX. */
             this.shearX = 0;
+            /** The local shearY. */
             this.shearY = 0;
+            /** The applied local x translation. */
             this.ax = 0;
+            /** The applied local y translation. */
             this.ay = 0;
+            /** The applied local rotation in degrees, counter clockwise. */
             this.arotation = 0;
+            /** The applied local scaleX. */
             this.ascaleX = 0;
+            /** The applied local scaleY. */
             this.ascaleY = 0;
+            /** The applied local shearX. */
             this.ashearX = 0;
+            /** The applied local shearY. */
             this.ashearY = 0;
+            /** If true, the applied transform matches the world transform. If false, the world transform has been modified since it was
+            * computed and {@link #updateAppliedTransform()} must be called before accessing the applied transform. */
             this.appliedValid = false;
+            /** Part of the world transform matrix for the X axis. If changed, {@link #appliedValid} should be set to false. */
             this.a = 0;
+            /** Part of the world transform matrix for the Y axis. If changed, {@link #appliedValid} should be set to false. */
             this.b = 0;
-            this.worldX = 0;
+            /** Part of the world transform matrix for the X axis. If changed, {@link #appliedValid} should be set to false. */
             this.c = 0;
+            /** Part of the world transform matrix for the Y axis. If changed, {@link #appliedValid} should be set to false. */
             this.d = 0;
+            /** The world X position. If changed, {@link #appliedValid} should be set to false. */
             this.worldY = 0;
+            /** The world Y position. If changed, {@link #appliedValid} should be set to false. */
+            this.worldX = 0;
             this.sorted = false;
+            this.active = false;
             if (data == null)
                 throw new Error("data cannot be null.");
             if (skeleton == null)
@@ -2672,15 +3194,25 @@ var spine;
             this.parent = parent;
             this.setToSetupPose();
         }
+        /** Returns false when the bone has not been computed because {@link BoneData#skinRequired} is true and the
+        * {@link Skeleton#skin active skin} does not {@link Skin#bones contain} this bone. */
+        Bone.prototype.isActive = function () {
+            return this.active;
+        };
         /** Same as {@link #updateWorldTransform()}. This method exists for Bone to implement {@link Updatable}. */
         Bone.prototype.update = function () {
             this.updateWorldTransformWith(this.x, this.y, this.rotation, this.scaleX, this.scaleY, this.shearX, this.shearY);
         };
-        /** Computes the world transform using the parent bone and this bone's local transform. */
+        /** Computes the world transform using the parent bone and this bone's local transform.
+         *
+         * See {@link #updateWorldTransformWith()}. */
         Bone.prototype.updateWorldTransform = function () {
             this.updateWorldTransformWith(this.x, this.y, this.rotation, this.scaleX, this.scaleY, this.shearX, this.shearY);
         };
-        /** Computes the world transform using the parent bone and the specified local transform. */
+        /** Computes the world transform using the parent bone and the specified local transform. Child bones are not updated.
+         *
+         * See [World transforms](http://esotericsoftware.com/spine-runtime-skeletons#World-transforms) in the Spine
+         * Runtimes Guide. */
         Bone.prototype.updateWorldTransformWith = function (x, y, rotation, scaleX, scaleY, shearX, shearY) {
             this.ax = x;
             this.ay = y;
@@ -2697,8 +3229,8 @@ var spine;
                 var sx = skeleton.scaleX;
                 var sy = skeleton.scaleY;
                 this.a = spine.MathUtils.cosDeg(rotation + shearX) * scaleX * sx;
-                this.b = spine.MathUtils.cosDeg(rotationY) * scaleY * sy;
-                this.c = spine.MathUtils.sinDeg(rotation + shearX) * scaleX * sx;
+                this.b = spine.MathUtils.cosDeg(rotationY) * scaleY * sx;
+                this.c = spine.MathUtils.sinDeg(rotation + shearX) * scaleX * sy;
                 this.d = spine.MathUtils.sinDeg(rotationY) * scaleY * sy;
                 this.worldX = x * sx + skeleton.x;
                 this.worldY = y * sy + skeleton.y;
@@ -2733,6 +3265,8 @@ var spine;
                     var prx = 0;
                     if (s > 0.0001) {
                         s = Math.abs(pa * pd - pb * pc) / s;
+                        pa /= this.skeleton.scaleX;
+                        pc /= this.skeleton.scaleY;
                         pb = pc * s;
                         pd = pa * s;
                         prx = Math.atan2(pc, pa) * spine.MathUtils.radDeg;
@@ -2788,6 +3322,7 @@ var spine;
             this.c *= this.skeleton.scaleY;
             this.d *= this.skeleton.scaleY;
         };
+        /** Sets this bone's local transform to the setup pose. */
         Bone.prototype.setToSetupPose = function () {
             var data = this.data;
             this.x = data.x;
@@ -2798,22 +3333,30 @@ var spine;
             this.shearX = data.shearX;
             this.shearY = data.shearY;
         };
+        /** The world rotation for the X axis, calculated using {@link #a} and {@link #c}. */
         Bone.prototype.getWorldRotationX = function () {
             return Math.atan2(this.c, this.a) * spine.MathUtils.radDeg;
         };
+        /** The world rotation for the Y axis, calculated using {@link #b} and {@link #d}. */
         Bone.prototype.getWorldRotationY = function () {
             return Math.atan2(this.d, this.b) * spine.MathUtils.radDeg;
         };
+        /** The magnitude (always positive) of the world scale X, calculated using {@link #a} and {@link #c}. */
         Bone.prototype.getWorldScaleX = function () {
             return Math.sqrt(this.a * this.a + this.c * this.c);
         };
+        /** The magnitude (always positive) of the world scale Y, calculated using {@link #b} and {@link #d}. */
         Bone.prototype.getWorldScaleY = function () {
             return Math.sqrt(this.b * this.b + this.d * this.d);
         };
-        /** Computes the individual applied transform values from the world transform. This can be useful to perform processing using
-         * the applied transform after the world transform has been modified directly (eg, by a constraint).
-         * <p>
-         * Some information is ambiguous in the world transform, such as -1,-1 scale versus 180 rotation. */
+        /** Computes the applied transform values from the world transform. This allows the applied transform to be accessed after the
+         * world transform has been modified (by a constraint, {@link #rotateWorld()}, etc).
+         *
+         * If {@link #updateWorldTransform()} has been called for a bone and {@link #appliedValid} is false, then
+         * {@link #updateAppliedTransform()} must be called before accessing the applied transform.
+         *
+         * Some information is ambiguous in the world transform, such as -1,-1 scale versus 180 rotation. The applied transform after
+         * calling this method is equivalent to the local tranform used to compute the world transform, but may not be identical. */
         Bone.prototype.updateAppliedTransform = function () {
             this.appliedValid = true;
             var parent = this.parent;
@@ -2855,6 +3398,7 @@ var spine;
                 this.arotation = 90 - Math.atan2(rd, rb) * spine.MathUtils.radDeg;
             }
         };
+        /** Transforms a point from world coordinates to the bone's local coordinates. */
         Bone.prototype.worldToLocal = function (world) {
             var a = this.a, b = this.b, c = this.c, d = this.d;
             var invDet = 1 / (a * d - b * c);
@@ -2863,21 +3407,26 @@ var spine;
             world.y = (y * a * invDet - x * c * invDet);
             return world;
         };
+        /** Transforms a point from the bone's local coordinates to world coordinates. */
         Bone.prototype.localToWorld = function (local) {
             var x = local.x, y = local.y;
             local.x = x * this.a + y * this.b + this.worldX;
             local.y = x * this.c + y * this.d + this.worldY;
             return local;
         };
+        /** Transforms a world rotation to a local rotation. */
         Bone.prototype.worldToLocalRotation = function (worldRotation) {
             var sin = spine.MathUtils.sinDeg(worldRotation), cos = spine.MathUtils.cosDeg(worldRotation);
             return Math.atan2(this.a * sin - this.c * cos, this.d * cos - this.b * sin) * spine.MathUtils.radDeg + this.rotation - this.shearX;
         };
+        /** Transforms a local rotation to a world rotation. */
         Bone.prototype.localToWorldRotation = function (localRotation) {
             localRotation -= this.rotation - this.shearX;
             var sin = spine.MathUtils.sinDeg(localRotation), cos = spine.MathUtils.cosDeg(localRotation);
             return Math.atan2(cos * this.c + sin * this.d, cos * this.a + sin * this.b) * spine.MathUtils.radDeg;
         };
+        /** Rotates the world transform the specified amount and sets {@link #appliedValid} to false.
+         * {@link #updateWorldTransform()} will need to be called on any child bones, recursively, and any constraints reapplied. */
         Bone.prototype.rotateWorld = function (degrees) {
             var a = this.a, b = this.b, c = this.c, d = this.d;
             var cos = spine.MathUtils.cosDeg(degrees), sin = spine.MathUtils.sinDeg(degrees);
@@ -2893,9 +3442,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -2908,29 +3457,73 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Stores the setup pose for a {@link Bone}. */
     var BoneData = /** @class */ (function () {
         function BoneData(index, name, parent) {
+            /** The local x translation. */
             this.x = 0;
+            /** The local y translation. */
             this.y = 0;
+            /** The local rotation. */
             this.rotation = 0;
+            /** The local scaleX. */
             this.scaleX = 1;
+            /** The local scaleY. */
             this.scaleY = 1;
+            /** The local shearX. */
             this.shearX = 0;
+            /** The local shearX. */
             this.shearY = 0;
+            /** The transform mode for how parent world transforms affect this bone. */
             this.transformMode = TransformMode.Normal;
+            /** When true, {@link Skeleton#updateWorldTransform()} only updates this bone if the {@link Skeleton#skin} contains this
+            * bone.
+            * @see Skin#bones */
+            this.skinRequired = false;
+            /** The color of the bone as it was in Spine. Available only when nonessential data was exported. Bones are not usually
+             * rendered at runtime. */
+            this.color = new spine.Color();
             if (index < 0)
                 throw new Error("index must be >= 0.");
             if (name == null)
@@ -2942,6 +3535,7 @@ var spine;
         return BoneData;
     }());
     spine.BoneData = BoneData;
+    /** Determines how a bone inherits world transforms from parent bones. */
     var TransformMode;
     (function (TransformMode) {
         TransformMode[TransformMode["Normal"] = 0] = "Normal";
@@ -2953,37 +3547,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
- *
- * Integration of the Spine Runtimes into software or otherwise creating
- * derivative works of the Spine Runtimes is permitted under the terms and
- * conditions of Section 2 of the Spine Editor License Agreement:
- * http://esotericsoftware.com/spine-editor-license
- *
- * Otherwise, it is permitted to integrate the Spine Runtimes into software
- * or otherwise create derivative works of the Spine Runtimes (collectively,
- * "Products"), provided that each user of the Products must obtain their own
- * Spine Editor license and redistribution of the Products in any form must
- * include this license and copyright notice.
- *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *****************************************************************************/
-/******************************************************************************
- * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
- *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -2996,19 +3562,121 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** The base class for all constraint datas. */
+    var ConstraintData = /** @class */ (function () {
+        function ConstraintData(name, order, skinRequired) {
+            this.name = name;
+            this.order = order;
+            this.skinRequired = skinRequired;
+        }
+        return ConstraintData;
+    }());
+    spine.ConstraintData = ConstraintData;
+})(spine || (spine = {}));
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
+var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
+(function (spine) {
+    /** Stores the current pose values for an {@link Event}.
+     *
+     * See Timeline {@link Timeline#apply()},
+     * AnimationStateListener {@link AnimationStateListener#event()}, and
+     * [Events](http://esotericsoftware.com/spine-events) in the Spine User Guide. */
     var Event = /** @class */ (function () {
         function Event(time, data) {
             if (data == null)
@@ -3022,9 +3690,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -3037,19 +3705,50 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Stores the setup pose values for an {@link Event}.
+     *
+     * See [Events](http://esotericsoftware.com/spine-events) in the Spine User Guide. */
     var EventData = /** @class */ (function () {
         function EventData(name) {
             this.name = name;
@@ -3060,9 +3759,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -3075,31 +3774,72 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Stores the current pose for an IK constraint. An IK constraint adjusts the rotation of 1 or 2 constrained bones so the tip of
+     * the last bone is as close to the target bone as possible.
+     *
+     * See [IK constraints](http://esotericsoftware.com/spine-ik-constraints) in the Spine User Guide. */
     var IkConstraint = /** @class */ (function () {
         function IkConstraint(data, skeleton) {
+            /** Controls the bend direction of the IK bones, either 1 or -1. */
             this.bendDirection = 0;
+            /** When true and only a single bone is being constrained, if the target is too close, the bone is scaled to reach it. */
             this.compress = false;
+            /** When true, if the target is out of range, the parent bone is scaled to reach it. If more than one bone is being constrained
+             * and the parent bone has local nonuniform scale, stretch is not applied. */
             this.stretch = false;
+            /** A percentage (0-1) that controls the mix between the constrained and unconstrained rotations. */
             this.mix = 1;
+            /** For two bone IK, the distance from the maximum reach of the bones that rotation will slow. */
+            this.softness = 0;
+            this.active = false;
             if (data == null)
                 throw new Error("data cannot be null.");
             if (skeleton == null)
                 throw new Error("skeleton cannot be null.");
             this.data = data;
             this.mix = data.mix;
+            this.softness = data.softness;
             this.bendDirection = data.bendDirection;
             this.compress = data.compress;
             this.stretch = data.stretch;
@@ -3108,9 +3848,10 @@ var spine;
                 this.bones.push(skeleton.findBone(data.bones[i].name));
             this.target = skeleton.findBone(data.target.name);
         }
-        IkConstraint.prototype.getOrder = function () {
-            return this.data.order;
+        IkConstraint.prototype.isActive = function () {
+            return this.active;
         };
+        /** Applies the constraint to the constrained bones. */
         IkConstraint.prototype.apply = function () {
             this.update();
         };
@@ -3122,20 +3863,37 @@ var spine;
                     this.apply1(bones[0], target.worldX, target.worldY, this.compress, this.stretch, this.data.uniform, this.mix);
                     break;
                 case 2:
-                    this.apply2(bones[0], bones[1], target.worldX, target.worldY, this.bendDirection, this.stretch, this.mix);
+                    this.apply2(bones[0], bones[1], target.worldX, target.worldY, this.bendDirection, this.stretch, this.softness, this.mix);
                     break;
             }
         };
-        /** Adjusts the bone rotation so the tip is as close to the target position as possible. The target is specified in the world
-         * coordinate system. */
+        /** Applies 1 bone IK. The target is specified in the world coordinate system. */
         IkConstraint.prototype.apply1 = function (bone, targetX, targetY, compress, stretch, uniform, alpha) {
             if (!bone.appliedValid)
                 bone.updateAppliedTransform();
             var p = bone.parent;
-            var id = 1 / (p.a * p.d - p.b * p.c);
-            var x = targetX - p.worldX, y = targetY - p.worldY;
-            var tx = (x * p.d - y * p.b) * id - bone.ax, ty = (y * p.a - x * p.c) * id - bone.ay;
-            var rotationIK = Math.atan2(ty, tx) * spine.MathUtils.radDeg - bone.ashearX - bone.arotation;
+            var pa = p.a, pb = p.b, pc = p.c, pd = p.d;
+            var rotationIK = -bone.ashearX - bone.arotation, tx = 0, ty = 0;
+            switch (bone.data.transformMode) {
+                case spine.TransformMode.OnlyTranslation:
+                    tx = targetX - bone.worldX;
+                    ty = targetY - bone.worldY;
+                    break;
+                case spine.TransformMode.NoRotationOrReflection:
+                    var s = Math.abs(pa * pd - pb * pc) / (pa * pa + pc * pc);
+                    var sa = pa / bone.skeleton.scaleX;
+                    var sc = pc / bone.skeleton.scaleY;
+                    pb = -sc * s * bone.skeleton.scaleX;
+                    pd = sa * s * bone.skeleton.scaleY;
+                    rotationIK += Math.atan2(sc, sa) * spine.MathUtils.radDeg;
+                // Fall through
+                default:
+                    var x = targetX - p.worldX, y = targetY - p.worldY;
+                    var d = pa * pd - pb * pc;
+                    tx = (x * pd - y * pb) / d - bone.ax;
+                    ty = (y * pa - x * pc) / d - bone.ay;
+            }
+            rotationIK += Math.atan2(ty, tx) * spine.MathUtils.radDeg;
             if (bone.ascaleX < 0)
                 rotationIK += 180;
             if (rotationIK > 180)
@@ -3144,6 +3902,12 @@ var spine;
                 rotationIK += 360;
             var sx = bone.ascaleX, sy = bone.ascaleY;
             if (compress || stretch) {
+                switch (bone.data.transformMode) {
+                    case spine.TransformMode.NoScale:
+                    case spine.TransformMode.NoScaleOrReflection:
+                        tx = targetX - bone.worldX;
+                        ty = targetY - bone.worldY;
+                }
                 var b = bone.data.length * sx, dd = Math.sqrt(tx * tx + ty * ty);
                 if ((compress && dd < b) || (stretch && dd > b) && b > 0.0001) {
                     var s = (dd / b - 1) * alpha + 1;
@@ -3154,10 +3918,9 @@ var spine;
             }
             bone.updateWorldTransformWith(bone.ax, bone.ay, bone.arotation + rotationIK * alpha, sx, sy, bone.ashearX, bone.ashearY);
         };
-        /** Adjusts the parent and child bone rotations so the tip of the child is as close to the target position as possible. The
-         * target is specified in the world coordinate system.
+        /** Applies 2 bone IK. The target is specified in the world coordinate system.
          * @param child A direct descendant of the parent bone. */
-        IkConstraint.prototype.apply2 = function (parent, child, targetX, targetY, bendDir, stretch, alpha) {
+        IkConstraint.prototype.apply2 = function (parent, child, targetX, targetY, bendDir, stretch, softness, alpha) {
             if (alpha == 0) {
                 child.updateWorldTransform();
                 return;
@@ -3204,12 +3967,29 @@ var spine;
             b = pp.b;
             c = pp.c;
             d = pp.d;
-            var id = 1 / (a * d - b * c), x = targetX - pp.worldX, y = targetY - pp.worldY;
-            var tx = (x * d - y * b) * id - px, ty = (y * a - x * c) * id - py, dd = tx * tx + ty * ty;
-            x = cwx - pp.worldX;
-            y = cwy - pp.worldY;
+            var id = 1 / (a * d - b * c), x = cwx - pp.worldX, y = cwy - pp.worldY;
             var dx = (x * d - y * b) * id - px, dy = (y * a - x * c) * id - py;
-            var l1 = Math.sqrt(dx * dx + dy * dy), l2 = child.data.length * csx, a1 = 0, a2 = 0;
+            var l1 = Math.sqrt(dx * dx + dy * dy), l2 = child.data.length * csx, a1, a2;
+            if (l1 < 0.0001) {
+                this.apply1(parent, targetX, targetY, false, stretch, false, alpha);
+                child.updateWorldTransformWith(cx, cy, 0, child.ascaleX, child.ascaleY, child.ashearX, child.ashearY);
+                return;
+            }
+            x = targetX - pp.worldX;
+            y = targetY - pp.worldY;
+            var tx = (x * d - y * b) * id - px, ty = (y * a - x * c) * id - py;
+            var dd = tx * tx + ty * ty;
+            if (softness != 0) {
+                softness *= psx * (csx + 1) / 2;
+                var td = Math.sqrt(dd), sd = td - l1 - l2 * psx + softness;
+                if (sd > 0) {
+                    var p = Math.min(1, sd / (softness * 2)) - 1;
+                    p = (sd - softness * (1 - p * p)) / td;
+                    tx -= p * tx;
+                    ty -= p * ty;
+                    dd = tx * tx + ty * ty;
+                }
+            }
             outer: if (u) {
                 l2 *= psx;
                 var cos = (dd - l1 * l1 - l2 * l2) / (2 * l1 * l2);
@@ -3217,7 +3997,7 @@ var spine;
                     cos = -1;
                 else if (cos > 1) {
                     cos = 1;
-                    if (stretch && l1 + l2 > 0.0001)
+                    if (stretch)
                         sx *= (Math.sqrt(dd) / (l1 + l2) - 1) * alpha + 1;
                 }
                 a2 = Math.acos(cos) * bendDir;
@@ -3298,9 +4078,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -3313,39 +4093,81 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
-    var IkConstraintData = /** @class */ (function () {
+    /** Stores the setup pose for an {@link IkConstraint}.
+     * <p>
+     * See [IK constraints](http://esotericsoftware.com/spine-ik-constraints) in the Spine User Guide. */
+    var IkConstraintData = /** @class */ (function (_super) {
+        __extends(IkConstraintData, _super);
         function IkConstraintData(name) {
-            this.order = 0;
-            this.bones = new Array();
-            this.bendDirection = 1;
-            this.compress = false;
-            this.stretch = false;
-            this.uniform = false;
-            this.mix = 1;
-            this.name = name;
+            var _this = _super.call(this, name, 0, false) || this;
+            /** The bones that are constrained by this IK constraint. */
+            _this.bones = new Array();
+            /** Controls the bend direction of the IK bones, either 1 or -1. */
+            _this.bendDirection = 1;
+            /** When true and only a single bone is being constrained, if the target is too close, the bone is scaled to reach it. */
+            _this.compress = false;
+            /** When true, if the target is out of range, the parent bone is scaled to reach it. If more than one bone is being constrained
+             * and the parent bone has local nonuniform scale, stretch is not applied. */
+            _this.stretch = false;
+            /** When true, only a single bone is being constrained, and {@link #getCompress()} or {@link #getStretch()} is used, the bone
+             * is scaled on both the X and Y axes. */
+            _this.uniform = false;
+            /** A percentage (0-1) that controls the mix between the constrained and unconstrained rotations. */
+            _this.mix = 1;
+            /** For two bone IK, the distance from the maximum reach of the bones that rotation will slow. */
+            _this.softness = 0;
+            return _this;
         }
         return IkConstraintData;
-    }());
+    }(spine.ConstraintData));
     spine.IkConstraintData = IkConstraintData;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -3358,24 +4180,60 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Stores the current pose for a path constraint. A path constraint adjusts the rotation, translation, and scale of the
+     * constrained bones so they follow a {@link PathAttachment}.
+     *
+     * See [Path constraints](http://esotericsoftware.com/spine-path-constraints) in the Spine User Guide. */
     var PathConstraint = /** @class */ (function () {
         function PathConstraint(data, skeleton) {
+            /** The position along the path. */
             this.position = 0;
+            /** The spacing between bones. */
             this.spacing = 0;
+            /** A percentage (0-1) that controls the mix between the constrained and unconstrained rotations. */
             this.rotateMix = 0;
+            /** A percentage (0-1) that controls the mix between the constrained and unconstrained translations. */
             this.translateMix = 0;
             this.spaces = new Array();
             this.positions = new Array();
@@ -3383,6 +4241,7 @@ var spine;
             this.curves = new Array();
             this.lengths = new Array();
             this.segments = new Array();
+            this.active = false;
             if (data == null)
                 throw new Error("data cannot be null.");
             if (skeleton == null)
@@ -3397,6 +4256,10 @@ var spine;
             this.rotateMix = data.rotateMix;
             this.translateMix = data.translateMix;
         }
+        PathConstraint.prototype.isActive = function () {
+            return this.active;
+        };
+        /** Applies the constraint to the constrained bones. */
         PathConstraint.prototype.apply = function () {
             this.update();
         };
@@ -3758,9 +4621,6 @@ var spine;
                     out[o + 2] = Math.atan2(y - (y1 * uu + cy1 * ut * 2 + cy2 * tt), x - (x1 * uu + cx1 * ut * 2 + cx2 * tt));
             }
         };
-        PathConstraint.prototype.getOrder = function () {
-            return this.data.order;
-        };
         PathConstraint.NONE = -1;
         PathConstraint.BEFORE = -2;
         PathConstraint.AFTER = -3;
@@ -3771,9 +4631,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -3786,39 +4646,81 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
-    var PathConstraintData = /** @class */ (function () {
+    /** Stores the setup pose for a {@link PathConstraint}.
+     *
+     * See [Path constraints](http://esotericsoftware.com/spine-path-constraints) in the Spine User Guide. */
+    var PathConstraintData = /** @class */ (function (_super) {
+        __extends(PathConstraintData, _super);
         function PathConstraintData(name) {
-            this.order = 0;
-            this.bones = new Array();
-            this.name = name;
+            var _this = _super.call(this, name, 0, false) || this;
+            /** The bones that will be modified by this path constraint. */
+            _this.bones = new Array();
+            return _this;
         }
         return PathConstraintData;
-    }());
+    }(spine.ConstraintData));
     spine.PathConstraintData = PathConstraintData;
+    /** Controls how the first bone is positioned along the path.
+     *
+     * See [Position mode](http://esotericsoftware.com/spine-path-constraints#Position-mode) in the Spine User Guide. */
     var PositionMode;
     (function (PositionMode) {
         PositionMode[PositionMode["Fixed"] = 0] = "Fixed";
         PositionMode[PositionMode["Percent"] = 1] = "Percent";
     })(PositionMode = spine.PositionMode || (spine.PositionMode = {}));
+    /** Controls how bones after the first bone are positioned along the path.
+     *
+     * [Spacing mode](http://esotericsoftware.com/spine-path-constraints#Spacing-mode) in the Spine User Guide. */
     var SpacingMode;
     (function (SpacingMode) {
         SpacingMode[SpacingMode["Length"] = 0] = "Length";
         SpacingMode[SpacingMode["Fixed"] = 1] = "Fixed";
         SpacingMode[SpacingMode["Percent"] = 2] = "Percent";
     })(SpacingMode = spine.SpacingMode || (spine.SpacingMode = {}));
+    /** Controls how bones are rotated, translated, and scaled to match the path.
+     *
+     * [Rotate mode](http://esotericsoftware.com/spine-path-constraints#Rotate-mod) in the Spine User Guide. */
     var RotateMode;
     (function (RotateMode) {
         RotateMode[RotateMode["Tangent"] = 0] = "Tangent";
@@ -3828,9 +4730,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -3843,18 +4745,46 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
     var Assets = /** @class */ (function () {
         function Assets(clientId) {
@@ -3904,6 +4834,7 @@ var spine;
             if (!this.queueAsset(clientId, null, path))
                 return;
             var request = new XMLHttpRequest();
+            request.overrideMimeType("text/html");
             request.onreadystatechange = function () {
                 if (request.readyState == XMLHttpRequest.DONE) {
                     if (request.status >= 200 && request.status < 300) {
@@ -3923,6 +4854,7 @@ var spine;
             if (!this.queueAsset(clientId, null, path))
                 return;
             var request = new XMLHttpRequest();
+            request.overrideMimeType("text/html");
             request.onreadystatechange = function () {
                 if (request.readyState == XMLHttpRequest.DONE) {
                     if (request.status >= 200 && request.status < 300) {
@@ -3942,7 +4874,6 @@ var spine;
             if (!this.queueAsset(clientId, textureLoader, path))
                 return;
             var img = new Image();
-            img.src = path;
             img.crossOrigin = "anonymous";
             img.onload = function (ev) {
                 _this.rawAssets[path] = img;
@@ -3950,6 +4881,7 @@ var spine;
             img.onerror = function (ev) {
                 _this.errors[path] = "Couldn't load image " + path;
             };
+            img.src = path;
         };
         SharedAssetManager.prototype.get = function (clientId, path) {
             path = this.pathPrefix + path;
@@ -4011,9 +4943,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -4026,27 +4958,68 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Stores the current pose for a skeleton.
+     *
+     * See [Instance objects](http://esotericsoftware.com/spine-runtime-architecture#Instance-objects) in the Spine Runtimes Guide. */
     var Skeleton = /** @class */ (function () {
         function Skeleton(data) {
+            /** The list of bones and constraints, sorted in the order they should be updated, as computed by {@link #updateCache()}. */
             this._updateCache = new Array();
             this.updateCacheReset = new Array();
+            /** Returns the skeleton's time. This can be used for tracking, such as with Slot {@link Slot#attachmentTime}.
+             * <p>
+             * See {@link #update()}. */
             this.time = 0;
+            /** Scales the entire skeleton on the X axis. This affects all bones, even if the bone's transform mode disallows scale
+            * inheritance. */
             this.scaleX = 1;
+            /** Scales the entire skeleton on the Y axis. This affects all bones, even if the bone's transform mode disallows scale
+            * inheritance. */
             this.scaleY = 1;
+            /** Sets the skeleton X position, which is added to the root bone worldX position. */
             this.x = 0;
+            /** Sets the skeleton Y position, which is added to the root bone worldY position. */
             this.y = 0;
             if (data == null)
                 throw new Error("data cannot be null.");
@@ -4091,13 +5064,29 @@ var spine;
             this.color = new spine.Color(1, 1, 1, 1);
             this.updateCache();
         }
+        /** Caches information about bones and constraints. Must be called if the {@link #getSkin()} is modified or if bones,
+         * constraints, or weighted path attachments are added or removed. */
         Skeleton.prototype.updateCache = function () {
             var updateCache = this._updateCache;
             updateCache.length = 0;
             this.updateCacheReset.length = 0;
             var bones = this.bones;
-            for (var i = 0, n = bones.length; i < n; i++)
-                bones[i].sorted = false;
+            for (var i = 0, n = bones.length; i < n; i++) {
+                var bone = bones[i];
+                bone.sorted = bone.data.skinRequired;
+                bone.active = !bone.sorted;
+            }
+            if (this.skin != null) {
+                var skinBones = this.skin.bones;
+                for (var i = 0, n = this.skin.bones.length; i < n; i++) {
+                    var bone = this.bones[skinBones[i].index];
+                    do {
+                        bone.sorted = false;
+                        bone.active = true;
+                        bone = bone.parent;
+                    } while (bone != null);
+                }
+            }
             // IK first, lowest hierarchy depth first.
             var ikConstraints = this.ikConstraints;
             var transformConstraints = this.transformConstraints;
@@ -4131,6 +5120,9 @@ var spine;
                 this.sortBone(bones[i]);
         };
         Skeleton.prototype.sortIkConstraint = function (constraint) {
+            constraint.active = constraint.target.isActive() && (!constraint.data.skinRequired || (this.skin != null && spine.Utils.contains(this.skin.constraints, constraint.data, true)));
+            if (!constraint.active)
+                return;
             var target = constraint.target;
             this.sortBone(target);
             var constrained = constraint.bones;
@@ -4146,6 +5138,9 @@ var spine;
             constrained[constrained.length - 1].sorted = true;
         };
         Skeleton.prototype.sortPathConstraint = function (constraint) {
+            constraint.active = constraint.target.bone.isActive() && (!constraint.data.skinRequired || (this.skin != null && spine.Utils.contains(this.skin.constraints, constraint.data, true)));
+            if (!constraint.active)
+                return;
             var slot = constraint.target;
             var slotIndex = slot.data.index;
             var slotBone = slot.bone;
@@ -4169,6 +5164,9 @@ var spine;
                 constrained[i].sorted = true;
         };
         Skeleton.prototype.sortTransformConstraint = function (constraint) {
+            constraint.active = constraint.target.isActive() && (!constraint.data.skinRequired || (this.skin != null && spine.Utils.contains(this.skin.constraints, constraint.data, true)));
+            if (!constraint.active)
+                return;
             this.sortBone(constraint.target);
             var constrained = constraint.bones;
             var boneCount = constrained.length;
@@ -4229,12 +5227,17 @@ var spine;
         Skeleton.prototype.sortReset = function (bones) {
             for (var i = 0, n = bones.length; i < n; i++) {
                 var bone = bones[i];
+                if (!bone.active)
+                    continue;
                 if (bone.sorted)
                     this.sortReset(bone.children);
                 bone.sorted = false;
             }
         };
-        /** Updates the world transform for each bone and applies constraints. */
+        /** Updates the world transform for each bone and applies all constraints.
+         *
+         * See [World transforms](http://esotericsoftware.com/spine-runtime-skeletons#World-transforms) in the Spine
+         * Runtimes Guide. */
         Skeleton.prototype.updateWorldTransform = function () {
             var updateCacheReset = this.updateCacheReset;
             for (var i = 0, n = updateCacheReset.length; i < n; i++) {
@@ -4266,6 +5269,7 @@ var spine;
             for (var i = 0, n = ikConstraints.length; i < n; i++) {
                 var constraint = ikConstraints[i];
                 constraint.mix = constraint.data.mix;
+                constraint.softness = constraint.data.softness;
                 constraint.bendDirection = constraint.data.bendDirection;
                 constraint.compress = constraint.data.compress;
                 constraint.stretch = constraint.data.stretch;
@@ -4289,19 +5293,20 @@ var spine;
                 constraint.translateMix = data.translateMix;
             }
         };
+        /** Sets the slots and draw order to their setup pose values. */
         Skeleton.prototype.setSlotsToSetupPose = function () {
             var slots = this.slots;
             spine.Utils.arrayCopy(slots, 0, this.drawOrder, 0, slots.length);
             for (var i = 0, n = slots.length; i < n; i++)
                 slots[i].setToSetupPose();
         };
-        /** @return May return null. */
+        /** @returns May return null. */
         Skeleton.prototype.getRootBone = function () {
             if (this.bones.length == 0)
                 return null;
             return this.bones[0];
         };
-        /** @return May be null. */
+        /** @returns May be null. */
         Skeleton.prototype.findBone = function (boneName) {
             if (boneName == null)
                 throw new Error("boneName cannot be null.");
@@ -4313,7 +5318,7 @@ var spine;
             }
             return null;
         };
-        /** @return -1 if the bone was not found. */
+        /** @returns -1 if the bone was not found. */
         Skeleton.prototype.findBoneIndex = function (boneName) {
             if (boneName == null)
                 throw new Error("boneName cannot be null.");
@@ -4323,7 +5328,9 @@ var spine;
                     return i;
             return -1;
         };
-        /** @return May be null. */
+        /** Finds a slot by comparing each slot's name. It is more efficient to cache the results of this method than to call it
+         * repeatedly.
+         * @returns May be null. */
         Skeleton.prototype.findSlot = function (slotName) {
             if (slotName == null)
                 throw new Error("slotName cannot be null.");
@@ -4335,7 +5342,7 @@ var spine;
             }
             return null;
         };
-        /** @return -1 if the bone was not found. */
+        /** @returns -1 if the bone was not found. */
         Skeleton.prototype.findSlotIndex = function (slotName) {
             if (slotName == null)
                 throw new Error("slotName cannot be null.");
@@ -4346,18 +5353,27 @@ var spine;
             return -1;
         };
         /** Sets a skin by name.
-         * @see #setSkin(Skin) */
+         *
+         * See {@link #setSkin()}. */
         Skeleton.prototype.setSkinByName = function (skinName) {
             var skin = this.data.findSkin(skinName);
             if (skin == null)
                 throw new Error("Skin not found: " + skinName);
             this.setSkin(skin);
         };
-        /** Sets the skin used to look up attachments before looking in the {@link SkeletonData#getDefaultSkin() default skin}.
+        /** Sets the skin used to look up attachments before looking in the {@link SkeletonData#defaultSkin default skin}. If the
+         * skin is changed, {@link #updateCache()} is called.
+         *
          * Attachments from the new skin are attached if the corresponding attachment from the old skin was attached. If there was no
          * old skin, each slot's setup mode attachment is attached from the new skin.
+         *
+         * After changing the skin, the visible attachments can be reset to those attached in the setup pose by calling
+         * {@link #setSlotsToSetupPose()}. Also, often {@link AnimationState#apply()} is called before the next time the
+         * skeleton is rendered to allow any attachment keys in the current animation(s) to hide or show attachments from the new skin.
          * @param newSkin May be null. */
         Skeleton.prototype.setSkin = function (newSkin) {
+            if (newSkin == this.skin)
+                return;
             if (newSkin != null) {
                 if (this.skin != null)
                     newSkin.attachAll(this, this.skin);
@@ -4375,12 +5391,21 @@ var spine;
                 }
             }
             this.skin = newSkin;
+            this.updateCache();
         };
-        /** @return May be null. */
+        /** Finds an attachment by looking in the {@link #skin} and {@link SkeletonData#defaultSkin} using the slot name and attachment
+         * name.
+         *
+         * See {@link #getAttachment()}.
+         * @returns May be null. */
         Skeleton.prototype.getAttachmentByName = function (slotName, attachmentName) {
             return this.getAttachment(this.data.findSlotIndex(slotName), attachmentName);
         };
-        /** @return May be null. */
+        /** Finds an attachment by looking in the {@link #skin} and {@link SkeletonData#defaultSkin} using the slot index and
+         * attachment name. First the skin is checked and if the attachment was not found, the default skin is checked.
+         *
+         * See [Runtime skins](http://esotericsoftware.com/spine-runtime-skins) in the Spine Runtimes Guide.
+         * @returns May be null. */
         Skeleton.prototype.getAttachment = function (slotIndex, attachmentName) {
             if (attachmentName == null)
                 throw new Error("attachmentName cannot be null.");
@@ -4393,7 +5418,9 @@ var spine;
                 return this.data.defaultSkin.getAttachment(slotIndex, attachmentName);
             return null;
         };
-        /** @param attachmentName May be null. */
+        /** A convenience method to set an attachment by finding the slot with {@link #findSlot()}, finding the attachment with
+         * {@link #getAttachment()}, then setting the slot's {@link Slot#attachment}.
+         * @param attachmentName May be null to clear the slot's attachment. */
         Skeleton.prototype.setAttachment = function (slotName, attachmentName) {
             if (slotName == null)
                 throw new Error("slotName cannot be null.");
@@ -4413,7 +5440,9 @@ var spine;
             }
             throw new Error("Slot not found: " + slotName);
         };
-        /** @return May be null. */
+        /** Finds an IK constraint by comparing each IK constraint's name. It is more efficient to cache the results of this method
+         * than to call it repeatedly.
+         * @return May be null. */
         Skeleton.prototype.findIkConstraint = function (constraintName) {
             if (constraintName == null)
                 throw new Error("constraintName cannot be null.");
@@ -4425,7 +5454,9 @@ var spine;
             }
             return null;
         };
-        /** @return May be null. */
+        /** Finds a transform constraint by comparing each transform constraint's name. It is more efficient to cache the results of
+         * this method than to call it repeatedly.
+         * @return May be null. */
         Skeleton.prototype.findTransformConstraint = function (constraintName) {
             if (constraintName == null)
                 throw new Error("constraintName cannot be null.");
@@ -4437,7 +5468,9 @@ var spine;
             }
             return null;
         };
-        /** @return May be null. */
+        /** Finds a path constraint by comparing each path constraint's name. It is more efficient to cache the results of this method
+         * than to call it repeatedly.
+         * @return May be null. */
         Skeleton.prototype.findPathConstraint = function (constraintName) {
             if (constraintName == null)
                 throw new Error("constraintName cannot be null.");
@@ -4450,9 +5483,9 @@ var spine;
             return null;
         };
         /** Returns the axis aligned bounding box (AABB) of the region and mesh attachments for the current pose.
-         * @param offset The distance from the skeleton origin to the bottom left corner of the AABB.
-         * @param size The width and height of the AABB.
-         * @param temp Working memory */
+         * @param offset An output value, the distance from the skeleton origin to the bottom left corner of the AABB.
+         * @param size An output value, the width and height of the AABB.
+         * @param temp Working memory to temporarily store attachments' computed world vertices. */
         Skeleton.prototype.getBounds = function (offset, size, temp) {
             if (temp === void 0) { temp = new Array(2); }
             if (offset == null)
@@ -4463,6 +5496,8 @@ var spine;
             var minX = Number.POSITIVE_INFINITY, minY = Number.POSITIVE_INFINITY, maxX = Number.NEGATIVE_INFINITY, maxY = Number.NEGATIVE_INFINITY;
             for (var i = 0, n = drawOrder.length; i < n; i++) {
                 var slot = drawOrder[i];
+                if (!slot.bone.active)
+                    continue;
                 var verticesLength = 0;
                 var vertices = null;
                 var attachment = slot.getAttachment();
@@ -4490,6 +5525,7 @@ var spine;
             offset.set(minX, minY);
             size.set(maxX - minX, maxY - minY);
         };
+        /** Increments the skeleton's {@link #time}. */
         Skeleton.prototype.update = function (delta) {
             this.time += delta;
         };
@@ -4499,9 +5535,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -4514,31 +5550,975 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Loads skeleton data in the Spine binary format.
+     *
+     * See [Spine binary format](http://esotericsoftware.com/spine-binary-format) and
+     * [JSON and binary data](http://esotericsoftware.com/spine-loading-skeleton-data#JSON-and-binary-data) in the Spine
+     * Runtimes Guide. */
+    var SkeletonBinary = /** @class */ (function () {
+        function SkeletonBinary(attachmentLoader) {
+            /** Scales bone positions, image sizes, and translations as they are loaded. This allows different size images to be used at
+             * runtime than were used in Spine.
+             *
+             * See [Scaling](http://esotericsoftware.com/spine-loading-skeleton-data#Scaling) in the Spine Runtimes Guide. */
+            this.scale = 1;
+            this.linkedMeshes = new Array();
+            this.attachmentLoader = attachmentLoader;
+        }
+        SkeletonBinary.prototype.readSkeletonData = function (binary) {
+            var scale = this.scale;
+            var skeletonData = new spine.SkeletonData();
+            skeletonData.name = ""; // BOZO
+            var input = new BinaryInput(binary);
+            skeletonData.hash = input.readString();
+            skeletonData.version = input.readString();
+            if ("3.8.75" == skeletonData.version)
+                throw new Error("Unsupported skeleton data, please export with a newer version of Spine.");
+            skeletonData.x = input.readFloat();
+            skeletonData.y = input.readFloat();
+            skeletonData.width = input.readFloat();
+            skeletonData.height = input.readFloat();
+            var nonessential = input.readBoolean();
+            if (nonessential) {
+                skeletonData.fps = input.readFloat();
+                skeletonData.imagesPath = input.readString();
+                skeletonData.audioPath = input.readString();
+            }
+            var n = 0;
+            // Strings.
+            n = input.readInt(true);
+            for (var i = 0; i < n; i++)
+                input.strings.push(input.readString());
+            // Bones.
+            n = input.readInt(true);
+            for (var i = 0; i < n; i++) {
+                var name_2 = input.readString();
+                var parent_2 = i == 0 ? null : skeletonData.bones[input.readInt(true)];
+                var data = new spine.BoneData(i, name_2, parent_2);
+                data.rotation = input.readFloat();
+                data.x = input.readFloat() * scale;
+                data.y = input.readFloat() * scale;
+                data.scaleX = input.readFloat();
+                data.scaleY = input.readFloat();
+                data.shearX = input.readFloat();
+                data.shearY = input.readFloat();
+                data.length = input.readFloat() * scale;
+                data.transformMode = SkeletonBinary.TransformModeValues[input.readInt(true)];
+                data.skinRequired = input.readBoolean();
+                if (nonessential)
+                    spine.Color.rgba8888ToColor(data.color, input.readInt32());
+                skeletonData.bones.push(data);
+            }
+            // Slots.
+            n = input.readInt(true);
+            for (var i = 0; i < n; i++) {
+                var slotName = input.readString();
+                var boneData = skeletonData.bones[input.readInt(true)];
+                var data = new spine.SlotData(i, slotName, boneData);
+                spine.Color.rgba8888ToColor(data.color, input.readInt32());
+                var darkColor = input.readInt32();
+                if (darkColor != -1)
+                    spine.Color.rgb888ToColor(data.darkColor = new spine.Color(), darkColor);
+                data.attachmentName = input.readStringRef();
+                data.blendMode = SkeletonBinary.BlendModeValues[input.readInt(true)];
+                skeletonData.slots.push(data);
+            }
+            // IK constraints.
+            n = input.readInt(true);
+            for (var i = 0, nn = void 0; i < n; i++) {
+                var data = new spine.IkConstraintData(input.readString());
+                data.order = input.readInt(true);
+                data.skinRequired = input.readBoolean();
+                nn = input.readInt(true);
+                for (var ii = 0; ii < nn; ii++)
+                    data.bones.push(skeletonData.bones[input.readInt(true)]);
+                data.target = skeletonData.bones[input.readInt(true)];
+                data.mix = input.readFloat();
+                data.softness = input.readFloat() * scale;
+                data.bendDirection = input.readByte();
+                data.compress = input.readBoolean();
+                data.stretch = input.readBoolean();
+                data.uniform = input.readBoolean();
+                skeletonData.ikConstraints.push(data);
+            }
+            // Transform constraints.
+            n = input.readInt(true);
+            for (var i = 0, nn = void 0; i < n; i++) {
+                var data = new spine.TransformConstraintData(input.readString());
+                data.order = input.readInt(true);
+                data.skinRequired = input.readBoolean();
+                nn = input.readInt(true);
+                for (var ii = 0; ii < nn; ii++)
+                    data.bones.push(skeletonData.bones[input.readInt(true)]);
+                data.target = skeletonData.bones[input.readInt(true)];
+                data.local = input.readBoolean();
+                data.relative = input.readBoolean();
+                data.offsetRotation = input.readFloat();
+                data.offsetX = input.readFloat() * scale;
+                data.offsetY = input.readFloat() * scale;
+                data.offsetScaleX = input.readFloat();
+                data.offsetScaleY = input.readFloat();
+                data.offsetShearY = input.readFloat();
+                data.rotateMix = input.readFloat();
+                data.translateMix = input.readFloat();
+                data.scaleMix = input.readFloat();
+                data.shearMix = input.readFloat();
+                skeletonData.transformConstraints.push(data);
+            }
+            // Path constraints.
+            n = input.readInt(true);
+            for (var i = 0, nn = void 0; i < n; i++) {
+                var data = new spine.PathConstraintData(input.readString());
+                data.order = input.readInt(true);
+                data.skinRequired = input.readBoolean();
+                nn = input.readInt(true);
+                for (var ii = 0; ii < nn; ii++)
+                    data.bones.push(skeletonData.bones[input.readInt(true)]);
+                data.target = skeletonData.slots[input.readInt(true)];
+                data.positionMode = SkeletonBinary.PositionModeValues[input.readInt(true)];
+                data.spacingMode = SkeletonBinary.SpacingModeValues[input.readInt(true)];
+                data.rotateMode = SkeletonBinary.RotateModeValues[input.readInt(true)];
+                data.offsetRotation = input.readFloat();
+                data.position = input.readFloat();
+                if (data.positionMode == spine.PositionMode.Fixed)
+                    data.position *= scale;
+                data.spacing = input.readFloat();
+                if (data.spacingMode == spine.SpacingMode.Length || data.spacingMode == spine.SpacingMode.Fixed)
+                    data.spacing *= scale;
+                data.rotateMix = input.readFloat();
+                data.translateMix = input.readFloat();
+                skeletonData.pathConstraints.push(data);
+            }
+            // Default skin.
+            var defaultSkin = this.readSkin(input, skeletonData, true, nonessential);
+            if (defaultSkin != null) {
+                skeletonData.defaultSkin = defaultSkin;
+                skeletonData.skins.push(defaultSkin);
+            }
+            // Skins.
+            {
+                var i = skeletonData.skins.length;
+                spine.Utils.setArraySize(skeletonData.skins, n = i + input.readInt(true));
+                for (; i < n; i++)
+                    skeletonData.skins[i] = this.readSkin(input, skeletonData, false, nonessential);
+            }
+            // Linked meshes.
+            n = this.linkedMeshes.length;
+            for (var i = 0; i < n; i++) {
+                var linkedMesh = this.linkedMeshes[i];
+                var skin = linkedMesh.skin == null ? skeletonData.defaultSkin : skeletonData.findSkin(linkedMesh.skin);
+                if (skin == null)
+                    throw new Error("Skin not found: " + linkedMesh.skin);
+                var parent_3 = skin.getAttachment(linkedMesh.slotIndex, linkedMesh.parent);
+                if (parent_3 == null)
+                    throw new Error("Parent mesh not found: " + linkedMesh.parent);
+                linkedMesh.mesh.deformAttachment = linkedMesh.inheritDeform ? parent_3 : linkedMesh.mesh;
+                linkedMesh.mesh.setParentMesh(parent_3);
+                linkedMesh.mesh.updateUVs();
+            }
+            this.linkedMeshes.length = 0;
+            // Events.
+            n = input.readInt(true);
+            for (var i = 0; i < n; i++) {
+                var data = new spine.EventData(input.readStringRef());
+                data.intValue = input.readInt(false);
+                data.floatValue = input.readFloat();
+                data.stringValue = input.readString();
+                data.audioPath = input.readString();
+                if (data.audioPath != null) {
+                    data.volume = input.readFloat();
+                    data.balance = input.readFloat();
+                }
+                skeletonData.events.push(data);
+            }
+            // Animations.
+            n = input.readInt(true);
+            for (var i = 0; i < n; i++)
+                skeletonData.animations.push(this.readAnimation(input, input.readString(), skeletonData));
+            return skeletonData;
+        };
+        SkeletonBinary.prototype.readSkin = function (input, skeletonData, defaultSkin, nonessential) {
+            var skin = null;
+            var slotCount = 0;
+            if (defaultSkin) {
+                slotCount = input.readInt(true);
+                if (slotCount == 0)
+                    return null;
+                skin = new spine.Skin("default");
+            }
+            else {
+                skin = new spine.Skin(input.readStringRef());
+                skin.bones.length = input.readInt(true);
+                for (var i = 0, n = skin.bones.length; i < n; i++)
+                    skin.bones[i] = skeletonData.bones[input.readInt(true)];
+                for (var i = 0, n = input.readInt(true); i < n; i++)
+                    skin.constraints.push(skeletonData.ikConstraints[input.readInt(true)]);
+                for (var i = 0, n = input.readInt(true); i < n; i++)
+                    skin.constraints.push(skeletonData.transformConstraints[input.readInt(true)]);
+                for (var i = 0, n = input.readInt(true); i < n; i++)
+                    skin.constraints.push(skeletonData.pathConstraints[input.readInt(true)]);
+                slotCount = input.readInt(true);
+            }
+            for (var i = 0; i < slotCount; i++) {
+                var slotIndex = input.readInt(true);
+                for (var ii = 0, nn = input.readInt(true); ii < nn; ii++) {
+                    var name_3 = input.readStringRef();
+                    var attachment = this.readAttachment(input, skeletonData, skin, slotIndex, name_3, nonessential);
+                    if (attachment != null)
+                        skin.setAttachment(slotIndex, name_3, attachment);
+                }
+            }
+            return skin;
+        };
+        SkeletonBinary.prototype.readAttachment = function (input, skeletonData, skin, slotIndex, attachmentName, nonessential) {
+            var scale = this.scale;
+            var name = input.readStringRef();
+            if (name == null)
+                name = attachmentName;
+            var typeIndex = input.readByte();
+            var type = SkeletonBinary.AttachmentTypeValues[typeIndex];
+            switch (type) {
+                case spine.AttachmentType.Region: {
+                    var path = input.readStringRef();
+                    var rotation = input.readFloat();
+                    var x = input.readFloat();
+                    var y = input.readFloat();
+                    var scaleX = input.readFloat();
+                    var scaleY = input.readFloat();
+                    var width = input.readFloat();
+                    var height = input.readFloat();
+                    var color = input.readInt32();
+                    if (path == null)
+                        path = name;
+                    var region = this.attachmentLoader.newRegionAttachment(skin, name, path);
+                    if (region == null)
+                        return null;
+                    region.path = path;
+                    region.x = x * scale;
+                    region.y = y * scale;
+                    region.scaleX = scaleX;
+                    region.scaleY = scaleY;
+                    region.rotation = rotation;
+                    region.width = width * scale;
+                    region.height = height * scale;
+                    spine.Color.rgba8888ToColor(region.color, color);
+                    region.updateOffset();
+                    return region;
+                }
+                case spine.AttachmentType.BoundingBox: {
+                    var vertexCount = input.readInt(true);
+                    var vertices = this.readVertices(input, vertexCount);
+                    var color = nonessential ? input.readInt32() : 0;
+                    var box = this.attachmentLoader.newBoundingBoxAttachment(skin, name);
+                    if (box == null)
+                        return null;
+                    box.worldVerticesLength = vertexCount << 1;
+                    box.vertices = vertices.vertices;
+                    box.bones = vertices.bones;
+                    if (nonessential)
+                        spine.Color.rgba8888ToColor(box.color, color);
+                    return box;
+                }
+                case spine.AttachmentType.Mesh: {
+                    var path = input.readStringRef();
+                    var color = input.readInt32();
+                    var vertexCount = input.readInt(true);
+                    var uvs = this.readFloatArray(input, vertexCount << 1, 1);
+                    var triangles = this.readShortArray(input);
+                    var vertices = this.readVertices(input, vertexCount);
+                    var hullLength = input.readInt(true);
+                    var edges = null;
+                    var width = 0, height = 0;
+                    if (nonessential) {
+                        edges = this.readShortArray(input);
+                        width = input.readFloat();
+                        height = input.readFloat();
+                    }
+                    if (path == null)
+                        path = name;
+                    var mesh = this.attachmentLoader.newMeshAttachment(skin, name, path);
+                    if (mesh == null)
+                        return null;
+                    mesh.path = path;
+                    spine.Color.rgba8888ToColor(mesh.color, color);
+                    mesh.bones = vertices.bones;
+                    mesh.vertices = vertices.vertices;
+                    mesh.worldVerticesLength = vertexCount << 1;
+                    mesh.triangles = triangles;
+                    mesh.regionUVs = uvs;
+                    mesh.updateUVs();
+                    mesh.hullLength = hullLength << 1;
+                    if (nonessential) {
+                        mesh.edges = edges;
+                        mesh.width = width * scale;
+                        mesh.height = height * scale;
+                    }
+                    return mesh;
+                }
+                case spine.AttachmentType.LinkedMesh: {
+                    var path = input.readStringRef();
+                    var color = input.readInt32();
+                    var skinName = input.readStringRef();
+                    var parent_4 = input.readStringRef();
+                    var inheritDeform = input.readBoolean();
+                    var width = 0, height = 0;
+                    if (nonessential) {
+                        width = input.readFloat();
+                        height = input.readFloat();
+                    }
+                    if (path == null)
+                        path = name;
+                    var mesh = this.attachmentLoader.newMeshAttachment(skin, name, path);
+                    if (mesh == null)
+                        return null;
+                    mesh.path = path;
+                    spine.Color.rgba8888ToColor(mesh.color, color);
+                    if (nonessential) {
+                        mesh.width = width * scale;
+                        mesh.height = height * scale;
+                    }
+                    this.linkedMeshes.push(new LinkedMesh(mesh, skinName, slotIndex, parent_4, inheritDeform));
+                    return mesh;
+                }
+                case spine.AttachmentType.Path: {
+                    var closed_1 = input.readBoolean();
+                    var constantSpeed = input.readBoolean();
+                    var vertexCount = input.readInt(true);
+                    var vertices = this.readVertices(input, vertexCount);
+                    var lengths = spine.Utils.newArray(vertexCount / 3, 0);
+                    for (var i = 0, n = lengths.length; i < n; i++)
+                        lengths[i] = input.readFloat() * scale;
+                    var color = nonessential ? input.readInt32() : 0;
+                    var path = this.attachmentLoader.newPathAttachment(skin, name);
+                    if (path == null)
+                        return null;
+                    path.closed = closed_1;
+                    path.constantSpeed = constantSpeed;
+                    path.worldVerticesLength = vertexCount << 1;
+                    path.vertices = vertices.vertices;
+                    path.bones = vertices.bones;
+                    path.lengths = lengths;
+                    if (nonessential)
+                        spine.Color.rgba8888ToColor(path.color, color);
+                    return path;
+                }
+                case spine.AttachmentType.Point: {
+                    var rotation = input.readFloat();
+                    var x = input.readFloat();
+                    var y = input.readFloat();
+                    var color = nonessential ? input.readInt32() : 0;
+                    var point = this.attachmentLoader.newPointAttachment(skin, name);
+                    if (point == null)
+                        return null;
+                    point.x = x * scale;
+                    point.y = y * scale;
+                    point.rotation = rotation;
+                    if (nonessential)
+                        spine.Color.rgba8888ToColor(point.color, color);
+                    return point;
+                }
+                case spine.AttachmentType.Clipping: {
+                    var endSlotIndex = input.readInt(true);
+                    var vertexCount = input.readInt(true);
+                    var vertices = this.readVertices(input, vertexCount);
+                    var color = nonessential ? input.readInt32() : 0;
+                    var clip = this.attachmentLoader.newClippingAttachment(skin, name);
+                    if (clip == null)
+                        return null;
+                    clip.endSlot = skeletonData.slots[endSlotIndex];
+                    clip.worldVerticesLength = vertexCount << 1;
+                    clip.vertices = vertices.vertices;
+                    clip.bones = vertices.bones;
+                    if (nonessential)
+                        spine.Color.rgba8888ToColor(clip.color, color);
+                    return clip;
+                }
+            }
+            return null;
+        };
+        SkeletonBinary.prototype.readVertices = function (input, vertexCount) {
+            var verticesLength = vertexCount << 1;
+            var vertices = new Vertices();
+            var scale = this.scale;
+            if (!input.readBoolean()) {
+                vertices.vertices = this.readFloatArray(input, verticesLength, scale);
+                return vertices;
+            }
+            var weights = new Array();
+            var bonesArray = new Array();
+            for (var i = 0; i < vertexCount; i++) {
+                var boneCount = input.readInt(true);
+                bonesArray.push(boneCount);
+                for (var ii = 0; ii < boneCount; ii++) {
+                    bonesArray.push(input.readInt(true));
+                    weights.push(input.readFloat() * scale);
+                    weights.push(input.readFloat() * scale);
+                    weights.push(input.readFloat());
+                }
+            }
+            vertices.vertices = spine.Utils.toFloatArray(weights);
+            vertices.bones = bonesArray;
+            return vertices;
+        };
+        SkeletonBinary.prototype.readFloatArray = function (input, n, scale) {
+            var array = new Array(n);
+            if (scale == 1) {
+                for (var i = 0; i < n; i++)
+                    array[i] = input.readFloat();
+            }
+            else {
+                for (var i = 0; i < n; i++)
+                    array[i] = input.readFloat() * scale;
+            }
+            return array;
+        };
+        SkeletonBinary.prototype.readShortArray = function (input) {
+            var n = input.readInt(true);
+            var array = new Array(n);
+            for (var i = 0; i < n; i++)
+                array[i] = input.readShort();
+            return array;
+        };
+        SkeletonBinary.prototype.readAnimation = function (input, name, skeletonData) {
+            var timelines = new Array();
+            var scale = this.scale;
+            var duration = 0;
+            var tempColor1 = new spine.Color();
+            var tempColor2 = new spine.Color();
+            // Slot timelines.
+            for (var i = 0, n = input.readInt(true); i < n; i++) {
+                var slotIndex = input.readInt(true);
+                for (var ii = 0, nn = input.readInt(true); ii < nn; ii++) {
+                    var timelineType = input.readByte();
+                    var frameCount = input.readInt(true);
+                    switch (timelineType) {
+                        case SkeletonBinary.SLOT_ATTACHMENT: {
+                            var timeline = new spine.AttachmentTimeline(frameCount);
+                            timeline.slotIndex = slotIndex;
+                            for (var frameIndex = 0; frameIndex < frameCount; frameIndex++)
+                                timeline.setFrame(frameIndex, input.readFloat(), input.readStringRef());
+                            timelines.push(timeline);
+                            duration = Math.max(duration, timeline.frames[frameCount - 1]);
+                            break;
+                        }
+                        case SkeletonBinary.SLOT_COLOR: {
+                            var timeline = new spine.ColorTimeline(frameCount);
+                            timeline.slotIndex = slotIndex;
+                            for (var frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+                                var time = input.readFloat();
+                                spine.Color.rgba8888ToColor(tempColor1, input.readInt32());
+                                timeline.setFrame(frameIndex, time, tempColor1.r, tempColor1.g, tempColor1.b, tempColor1.a);
+                                if (frameIndex < frameCount - 1)
+                                    this.readCurve(input, frameIndex, timeline);
+                            }
+                            timelines.push(timeline);
+                            duration = Math.max(duration, timeline.frames[(frameCount - 1) * spine.ColorTimeline.ENTRIES]);
+                            break;
+                        }
+                        case SkeletonBinary.SLOT_TWO_COLOR: {
+                            var timeline = new spine.TwoColorTimeline(frameCount);
+                            timeline.slotIndex = slotIndex;
+                            for (var frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+                                var time = input.readFloat();
+                                spine.Color.rgba8888ToColor(tempColor1, input.readInt32());
+                                spine.Color.rgb888ToColor(tempColor2, input.readInt32());
+                                timeline.setFrame(frameIndex, time, tempColor1.r, tempColor1.g, tempColor1.b, tempColor1.a, tempColor2.r, tempColor2.g, tempColor2.b);
+                                if (frameIndex < frameCount - 1)
+                                    this.readCurve(input, frameIndex, timeline);
+                            }
+                            timelines.push(timeline);
+                            duration = Math.max(duration, timeline.frames[(frameCount - 1) * spine.TwoColorTimeline.ENTRIES]);
+                            break;
+                        }
+                    }
+                }
+            }
+            // Bone timelines.
+            for (var i = 0, n = input.readInt(true); i < n; i++) {
+                var boneIndex = input.readInt(true);
+                for (var ii = 0, nn = input.readInt(true); ii < nn; ii++) {
+                    var timelineType = input.readByte();
+                    var frameCount = input.readInt(true);
+                    switch (timelineType) {
+                        case SkeletonBinary.BONE_ROTATE: {
+                            var timeline = new spine.RotateTimeline(frameCount);
+                            timeline.boneIndex = boneIndex;
+                            for (var frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+                                timeline.setFrame(frameIndex, input.readFloat(), input.readFloat());
+                                if (frameIndex < frameCount - 1)
+                                    this.readCurve(input, frameIndex, timeline);
+                            }
+                            timelines.push(timeline);
+                            duration = Math.max(duration, timeline.frames[(frameCount - 1) * spine.RotateTimeline.ENTRIES]);
+                            break;
+                        }
+                        case SkeletonBinary.BONE_TRANSLATE:
+                        case SkeletonBinary.BONE_SCALE:
+                        case SkeletonBinary.BONE_SHEAR: {
+                            var timeline = void 0;
+                            var timelineScale = 1;
+                            if (timelineType == SkeletonBinary.BONE_SCALE)
+                                timeline = new spine.ScaleTimeline(frameCount);
+                            else if (timelineType == SkeletonBinary.BONE_SHEAR)
+                                timeline = new spine.ShearTimeline(frameCount);
+                            else {
+                                timeline = new spine.TranslateTimeline(frameCount);
+                                timelineScale = scale;
+                            }
+                            timeline.boneIndex = boneIndex;
+                            for (var frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+                                timeline.setFrame(frameIndex, input.readFloat(), input.readFloat() * timelineScale, input.readFloat() * timelineScale);
+                                if (frameIndex < frameCount - 1)
+                                    this.readCurve(input, frameIndex, timeline);
+                            }
+                            timelines.push(timeline);
+                            duration = Math.max(duration, timeline.frames[(frameCount - 1) * spine.TranslateTimeline.ENTRIES]);
+                            break;
+                        }
+                    }
+                }
+            }
+            // IK constraint timelines.
+            for (var i = 0, n = input.readInt(true); i < n; i++) {
+                var index = input.readInt(true);
+                var frameCount = input.readInt(true);
+                var timeline = new spine.IkConstraintTimeline(frameCount);
+                timeline.ikConstraintIndex = index;
+                for (var frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+                    timeline.setFrame(frameIndex, input.readFloat(), input.readFloat(), input.readFloat() * scale, input.readByte(), input.readBoolean(), input.readBoolean());
+                    if (frameIndex < frameCount - 1)
+                        this.readCurve(input, frameIndex, timeline);
+                }
+                timelines.push(timeline);
+                duration = Math.max(duration, timeline.frames[(frameCount - 1) * spine.IkConstraintTimeline.ENTRIES]);
+            }
+            // Transform constraint timelines.
+            for (var i = 0, n = input.readInt(true); i < n; i++) {
+                var index = input.readInt(true);
+                var frameCount = input.readInt(true);
+                var timeline = new spine.TransformConstraintTimeline(frameCount);
+                timeline.transformConstraintIndex = index;
+                for (var frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+                    timeline.setFrame(frameIndex, input.readFloat(), input.readFloat(), input.readFloat(), input.readFloat(), input.readFloat());
+                    if (frameIndex < frameCount - 1)
+                        this.readCurve(input, frameIndex, timeline);
+                }
+                timelines.push(timeline);
+                duration = Math.max(duration, timeline.frames[(frameCount - 1) * spine.TransformConstraintTimeline.ENTRIES]);
+            }
+            // Path constraint timelines.
+            for (var i = 0, n = input.readInt(true); i < n; i++) {
+                var index = input.readInt(true);
+                var data = skeletonData.pathConstraints[index];
+                for (var ii = 0, nn = input.readInt(true); ii < nn; ii++) {
+                    var timelineType = input.readByte();
+                    var frameCount = input.readInt(true);
+                    switch (timelineType) {
+                        case SkeletonBinary.PATH_POSITION:
+                        case SkeletonBinary.PATH_SPACING: {
+                            var timeline = void 0;
+                            var timelineScale = 1;
+                            if (timelineType == SkeletonBinary.PATH_SPACING) {
+                                timeline = new spine.PathConstraintSpacingTimeline(frameCount);
+                                if (data.spacingMode == spine.SpacingMode.Length || data.spacingMode == spine.SpacingMode.Fixed)
+                                    timelineScale = scale;
+                            }
+                            else {
+                                timeline = new spine.PathConstraintPositionTimeline(frameCount);
+                                if (data.positionMode == spine.PositionMode.Fixed)
+                                    timelineScale = scale;
+                            }
+                            timeline.pathConstraintIndex = index;
+                            for (var frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+                                timeline.setFrame(frameIndex, input.readFloat(), input.readFloat() * timelineScale);
+                                if (frameIndex < frameCount - 1)
+                                    this.readCurve(input, frameIndex, timeline);
+                            }
+                            timelines.push(timeline);
+                            duration = Math.max(duration, timeline.frames[(frameCount - 1) * spine.PathConstraintPositionTimeline.ENTRIES]);
+                            break;
+                        }
+                        case SkeletonBinary.PATH_MIX: {
+                            var timeline = new spine.PathConstraintMixTimeline(frameCount);
+                            timeline.pathConstraintIndex = index;
+                            for (var frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+                                timeline.setFrame(frameIndex, input.readFloat(), input.readFloat(), input.readFloat());
+                                if (frameIndex < frameCount - 1)
+                                    this.readCurve(input, frameIndex, timeline);
+                            }
+                            timelines.push(timeline);
+                            duration = Math.max(duration, timeline.frames[(frameCount - 1) * spine.PathConstraintMixTimeline.ENTRIES]);
+                            break;
+                        }
+                    }
+                }
+            }
+            // Deform timelines.
+            for (var i = 0, n = input.readInt(true); i < n; i++) {
+                var skin = skeletonData.skins[input.readInt(true)];
+                for (var ii = 0, nn = input.readInt(true); ii < nn; ii++) {
+                    var slotIndex = input.readInt(true);
+                    for (var iii = 0, nnn = input.readInt(true); iii < nnn; iii++) {
+                        var attachment = skin.getAttachment(slotIndex, input.readStringRef());
+                        var weighted = attachment.bones != null;
+                        var vertices = attachment.vertices;
+                        var deformLength = weighted ? vertices.length / 3 * 2 : vertices.length;
+                        var frameCount = input.readInt(true);
+                        var timeline = new spine.DeformTimeline(frameCount);
+                        timeline.slotIndex = slotIndex;
+                        timeline.attachment = attachment;
+                        for (var frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+                            var time = input.readFloat();
+                            var deform = void 0;
+                            var end = input.readInt(true);
+                            if (end == 0)
+                                deform = weighted ? spine.Utils.newFloatArray(deformLength) : vertices;
+                            else {
+                                deform = spine.Utils.newFloatArray(deformLength);
+                                var start = input.readInt(true);
+                                end += start;
+                                if (scale == 1) {
+                                    for (var v = start; v < end; v++)
+                                        deform[v] = input.readFloat();
+                                }
+                                else {
+                                    for (var v = start; v < end; v++)
+                                        deform[v] = input.readFloat() * scale;
+                                }
+                                if (!weighted) {
+                                    for (var v = 0, vn = deform.length; v < vn; v++)
+                                        deform[v] += vertices[v];
+                                }
+                            }
+                            timeline.setFrame(frameIndex, time, deform);
+                            if (frameIndex < frameCount - 1)
+                                this.readCurve(input, frameIndex, timeline);
+                        }
+                        timelines.push(timeline);
+                        duration = Math.max(duration, timeline.frames[frameCount - 1]);
+                    }
+                }
+            }
+            // Draw order timeline.
+            var drawOrderCount = input.readInt(true);
+            if (drawOrderCount > 0) {
+                var timeline = new spine.DrawOrderTimeline(drawOrderCount);
+                var slotCount = skeletonData.slots.length;
+                for (var i = 0; i < drawOrderCount; i++) {
+                    var time = input.readFloat();
+                    var offsetCount = input.readInt(true);
+                    var drawOrder = spine.Utils.newArray(slotCount, 0);
+                    for (var ii = slotCount - 1; ii >= 0; ii--)
+                        drawOrder[ii] = -1;
+                    var unchanged = spine.Utils.newArray(slotCount - offsetCount, 0);
+                    var originalIndex = 0, unchangedIndex = 0;
+                    for (var ii = 0; ii < offsetCount; ii++) {
+                        var slotIndex = input.readInt(true);
+                        // Collect unchanged items.
+                        while (originalIndex != slotIndex)
+                            unchanged[unchangedIndex++] = originalIndex++;
+                        // Set changed items.
+                        drawOrder[originalIndex + input.readInt(true)] = originalIndex++;
+                    }
+                    // Collect remaining unchanged items.
+                    while (originalIndex < slotCount)
+                        unchanged[unchangedIndex++] = originalIndex++;
+                    // Fill in unchanged items.
+                    for (var ii = slotCount - 1; ii >= 0; ii--)
+                        if (drawOrder[ii] == -1)
+                            drawOrder[ii] = unchanged[--unchangedIndex];
+                    timeline.setFrame(i, time, drawOrder);
+                }
+                timelines.push(timeline);
+                duration = Math.max(duration, timeline.frames[drawOrderCount - 1]);
+            }
+            // Event timeline.
+            var eventCount = input.readInt(true);
+            if (eventCount > 0) {
+                var timeline = new spine.EventTimeline(eventCount);
+                for (var i = 0; i < eventCount; i++) {
+                    var time = input.readFloat();
+                    var eventData = skeletonData.events[input.readInt(true)];
+                    var event_4 = new spine.Event(time, eventData);
+                    event_4.intValue = input.readInt(false);
+                    event_4.floatValue = input.readFloat();
+                    event_4.stringValue = input.readBoolean() ? input.readString() : eventData.stringValue;
+                    if (event_4.data.audioPath != null) {
+                        event_4.volume = input.readFloat();
+                        event_4.balance = input.readFloat();
+                    }
+                    timeline.setFrame(i, event_4);
+                }
+                timelines.push(timeline);
+                duration = Math.max(duration, timeline.frames[eventCount - 1]);
+            }
+            return new spine.Animation(name, timelines, duration);
+        };
+        SkeletonBinary.prototype.readCurve = function (input, frameIndex, timeline) {
+            switch (input.readByte()) {
+                case SkeletonBinary.CURVE_STEPPED:
+                    timeline.setStepped(frameIndex);
+                    break;
+                case SkeletonBinary.CURVE_BEZIER:
+                    this.setCurve(timeline, frameIndex, input.readFloat(), input.readFloat(), input.readFloat(), input.readFloat());
+                    break;
+            }
+        };
+        SkeletonBinary.prototype.setCurve = function (timeline, frameIndex, cx1, cy1, cx2, cy2) {
+            timeline.setCurve(frameIndex, cx1, cy1, cx2, cy2);
+        };
+        SkeletonBinary.AttachmentTypeValues = [0 /*AttachmentType.Region*/, 1 /*AttachmentType.BoundingBox*/, 2 /*AttachmentType.Mesh*/, 3 /*AttachmentType.LinkedMesh*/, 4 /*AttachmentType.Path*/, 5 /*AttachmentType.Point*/, 6 /*AttachmentType.Clipping*/];
+        SkeletonBinary.TransformModeValues = [spine.TransformMode.Normal, spine.TransformMode.OnlyTranslation, spine.TransformMode.NoRotationOrReflection, spine.TransformMode.NoScale, spine.TransformMode.NoScaleOrReflection];
+        SkeletonBinary.PositionModeValues = [spine.PositionMode.Fixed, spine.PositionMode.Percent];
+        SkeletonBinary.SpacingModeValues = [spine.SpacingMode.Length, spine.SpacingMode.Fixed, spine.SpacingMode.Percent];
+        SkeletonBinary.RotateModeValues = [spine.RotateMode.Tangent, spine.RotateMode.Chain, spine.RotateMode.ChainScale];
+        SkeletonBinary.BlendModeValues = [spine.BlendMode.Normal, spine.BlendMode.Additive, spine.BlendMode.Multiply, spine.BlendMode.Screen];
+        SkeletonBinary.BONE_ROTATE = 0;
+        SkeletonBinary.BONE_TRANSLATE = 1;
+        SkeletonBinary.BONE_SCALE = 2;
+        SkeletonBinary.BONE_SHEAR = 3;
+        SkeletonBinary.SLOT_ATTACHMENT = 0;
+        SkeletonBinary.SLOT_COLOR = 1;
+        SkeletonBinary.SLOT_TWO_COLOR = 2;
+        SkeletonBinary.PATH_POSITION = 0;
+        SkeletonBinary.PATH_SPACING = 1;
+        SkeletonBinary.PATH_MIX = 2;
+        SkeletonBinary.CURVE_LINEAR = 0;
+        SkeletonBinary.CURVE_STEPPED = 1;
+        SkeletonBinary.CURVE_BEZIER = 2;
+        return SkeletonBinary;
+    }());
+    spine.SkeletonBinary = SkeletonBinary;
+    var BinaryInput = /** @class */ (function () {
+        function BinaryInput(data, strings, index, buffer) {
+            if (strings === void 0) { strings = new Array(); }
+            if (index === void 0) { index = 0; }
+            if (buffer === void 0) { buffer = new DataView(data.buffer); }
+            this.strings = strings;
+            this.index = index;
+            this.buffer = buffer;
+        }
+        BinaryInput.prototype.readByte = function () {
+            return this.buffer.getInt8(this.index++);
+        };
+        BinaryInput.prototype.readShort = function () {
+            var value = this.buffer.getInt16(this.index);
+            this.index += 2;
+            return value;
+        };
+        BinaryInput.prototype.readInt32 = function () {
+            var value = this.buffer.getInt32(this.index);
+            this.index += 4;
+            return value;
+        };
+        BinaryInput.prototype.readInt = function (optimizePositive) {
+            var b = this.readByte();
+            var result = b & 0x7F;
+            if ((b & 0x80) != 0) {
+                b = this.readByte();
+                result |= (b & 0x7F) << 7;
+                if ((b & 0x80) != 0) {
+                    b = this.readByte();
+                    result |= (b & 0x7F) << 14;
+                    if ((b & 0x80) != 0) {
+                        b = this.readByte();
+                        result |= (b & 0x7F) << 21;
+                        if ((b & 0x80) != 0) {
+                            b = this.readByte();
+                            result |= (b & 0x7F) << 28;
+                        }
+                    }
+                }
+            }
+            return optimizePositive ? result : ((result >>> 1) ^ -(result & 1));
+        };
+        BinaryInput.prototype.readStringRef = function () {
+            var index = this.readInt(true);
+            return index == 0 ? null : this.strings[index - 1];
+        };
+        BinaryInput.prototype.readString = function () {
+            var byteCount = this.readInt(true);
+            switch (byteCount) {
+                case 0:
+                    return null;
+                case 1:
+                    return "";
+            }
+            byteCount--;
+            var chars = "";
+            var charCount = 0;
+            for (var i = 0; i < byteCount;) {
+                var b = this.readByte();
+                switch (b >> 4) {
+                    case 12:
+                    case 13:
+                        chars += String.fromCharCode(((b & 0x1F) << 6 | this.readByte() & 0x3F));
+                        i += 2;
+                        break;
+                    case 14:
+                        chars += String.fromCharCode(((b & 0x0F) << 12 | (this.readByte() & 0x3F) << 6 | this.readByte() & 0x3F));
+                        i += 3;
+                        break;
+                    default:
+                        chars += String.fromCharCode(b);
+                        i++;
+                }
+            }
+            return chars;
+        };
+        BinaryInput.prototype.readFloat = function () {
+            var value = this.buffer.getFloat32(this.index);
+            this.index += 4;
+            return value;
+        };
+        BinaryInput.prototype.readBoolean = function () {
+            return this.readByte() != 0;
+        };
+        return BinaryInput;
+    }());
+    var LinkedMesh = /** @class */ (function () {
+        function LinkedMesh(mesh, skin, slotIndex, parent, inheritDeform) {
+            this.mesh = mesh;
+            this.skin = skin;
+            this.slotIndex = slotIndex;
+            this.parent = parent;
+            this.inheritDeform = inheritDeform;
+        }
+        return LinkedMesh;
+    }());
+    var Vertices = /** @class */ (function () {
+        function Vertices(bones, vertices) {
+            if (bones === void 0) { bones = null; }
+            if (vertices === void 0) { vertices = null; }
+            this.bones = bones;
+            this.vertices = vertices;
+        }
+        return Vertices;
+    }());
+})(spine || (spine = {}));
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
+var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
+(function (spine) {
+    /** Collects each visible {@link BoundingBoxAttachment} and computes the world vertices for its polygon. The polygon vertices are
+     * provided along with convenience methods for doing hit detection. */
     var SkeletonBounds = /** @class */ (function () {
         function SkeletonBounds() {
+            /** The left edge of the axis aligned bounding box. */
             this.minX = 0;
+            /** The bottom edge of the axis aligned bounding box. */
             this.minY = 0;
+            /** The right edge of the axis aligned bounding box. */
             this.maxX = 0;
+            /** The top edge of the axis aligned bounding box. */
             this.maxY = 0;
+            /** The visible bounding boxes. */
             this.boundingBoxes = new Array();
+            /** The world vertices for the bounding box polygons. */
             this.polygons = new Array();
             this.polygonPool = new spine.Pool(function () {
                 return spine.Utils.newFloatArray(16);
             });
         }
+        /** Clears any previous polygons, finds all visible bounding box attachments, and computes the world vertices for each bounding
+         * box's polygon.
+         * @param updateAabb If true, the axis aligned bounding box containing all the polygons is computed. If false, the
+         *           SkeletonBounds AABB methods will always return true. */
         SkeletonBounds.prototype.update = function (skeleton, updateAabb) {
             if (skeleton == null)
                 throw new Error("skeleton cannot be null.");
@@ -4552,6 +6532,8 @@ var spine;
             polygons.length = 0;
             for (var i = 0; i < slotCount; i++) {
                 var slot = slots[i];
+                if (!slot.bone.active)
+                    continue;
                 var attachment = slot.getAttachment();
                 if (attachment instanceof spine.BoundingBoxAttachment) {
                     var boundingBox = attachment;
@@ -4653,7 +6635,7 @@ var spine;
             return inside;
         };
         /** Returns the first bounding box attachment that contains any part of the line segment, or null. When doing many checks, it
-         * is usually more efficient to only call this method if {@link #aabbIntersectsSegment(float, float, float, float)} returns
+         * is usually more efficient to only call this method if {@link #aabbIntersectsSegment()} returns
          * true. */
         SkeletonBounds.prototype.intersectsSegment = function (x1, y1, x2, y2) {
             var polygons = this.polygons;
@@ -4692,9 +6674,11 @@ var spine;
             var index = this.boundingBoxes.indexOf(boundingBox);
             return index == -1 ? null : this.polygons[index];
         };
+        /** The width of the axis aligned bounding box. */
         SkeletonBounds.prototype.getWidth = function () {
             return this.maxX - this.minX;
         };
+        /** The height of the axis aligned bounding box. */
         SkeletonBounds.prototype.getHeight = function () {
             return this.maxY - this.minY;
         };
@@ -4704,9 +6688,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -4719,18 +6703,46 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
     var SkeletonClipping = /** @class */ (function () {
         function SkeletonClipping() {
@@ -4751,7 +6763,7 @@ var spine;
             var clippingPolygon = this.clippingPolygon;
             SkeletonClipping.makeClockwise(clippingPolygon);
             var clippingPolygons = this.clippingPolygons = this.triangulator.decompose(clippingPolygon, this.triangulator.triangulate(clippingPolygon));
-            for (var i = 0, n_1 = clippingPolygons.length; i < n_1; i++) {
+            for (var i = 0, n_2 = clippingPolygons.length; i < n_2; i++) {
                 var polygon = clippingPolygons[i];
                 SkeletonClipping.makeClockwise(polygon);
                 polygon.push(polygon[0]);
@@ -5030,9 +7042,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -5045,32 +7057,75 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Stores the setup pose and all of the stateless data for a skeleton.
+     *
+     * See [Data objects](http://esotericsoftware.com/spine-runtime-architecture#Data-objects) in the Spine Runtimes
+     * Guide. */
     var SkeletonData = /** @class */ (function () {
         function SkeletonData() {
+            /** The skeleton's bones, sorted parent first. The root bone is always the first bone. */
             this.bones = new Array(); // Ordered parents first.
+            /** The skeleton's slots. */
             this.slots = new Array(); // Setup pose draw order.
             this.skins = new Array();
+            /** The skeleton's events. */
             this.events = new Array();
+            /** The skeleton's animations. */
             this.animations = new Array();
+            /** The skeleton's IK constraints. */
             this.ikConstraints = new Array();
+            /** The skeleton's transform constraints. */
             this.transformConstraints = new Array();
+            /** The skeleton's path constraints. */
             this.pathConstraints = new Array();
             // Nonessential
+            /** The dopesheet FPS in Spine. Available only when nonessential data was exported. */
             this.fps = 0;
         }
+        /** Finds a bone by comparing each bone's name. It is more efficient to cache the results of this method than to call it
+         * multiple times.
+         * @returns May be null. */
         SkeletonData.prototype.findBone = function (boneName) {
             if (boneName == null)
                 throw new Error("boneName cannot be null.");
@@ -5091,6 +7146,9 @@ var spine;
                     return i;
             return -1;
         };
+        /** Finds a slot by comparing each slot's name. It is more efficient to cache the results of this method than to call it
+         * multiple times.
+         * @returns May be null. */
         SkeletonData.prototype.findSlot = function (slotName) {
             if (slotName == null)
                 throw new Error("slotName cannot be null.");
@@ -5111,6 +7169,9 @@ var spine;
                     return i;
             return -1;
         };
+        /** Finds a skin by comparing each skin's name. It is more efficient to cache the results of this method than to call it
+         * multiple times.
+         * @returns May be null. */
         SkeletonData.prototype.findSkin = function (skinName) {
             if (skinName == null)
                 throw new Error("skinName cannot be null.");
@@ -5122,17 +7183,23 @@ var spine;
             }
             return null;
         };
+        /** Finds an event by comparing each events's name. It is more efficient to cache the results of this method than to call it
+         * multiple times.
+         * @returns May be null. */
         SkeletonData.prototype.findEvent = function (eventDataName) {
             if (eventDataName == null)
                 throw new Error("eventDataName cannot be null.");
             var events = this.events;
             for (var i = 0, n = events.length; i < n; i++) {
-                var event_4 = events[i];
-                if (event_4.name == eventDataName)
-                    return event_4;
+                var event_5 = events[i];
+                if (event_5.name == eventDataName)
+                    return event_5;
             }
             return null;
         };
+        /** Finds an animation by comparing each animation's name. It is more efficient to cache the results of this method than to
+         * call it multiple times.
+         * @returns May be null. */
         SkeletonData.prototype.findAnimation = function (animationName) {
             if (animationName == null)
                 throw new Error("animationName cannot be null.");
@@ -5144,6 +7211,9 @@ var spine;
             }
             return null;
         };
+        /** Finds an IK constraint by comparing each IK constraint's name. It is more efficient to cache the results of this method
+         * than to call it multiple times.
+         * @return May be null. */
         SkeletonData.prototype.findIkConstraint = function (constraintName) {
             if (constraintName == null)
                 throw new Error("constraintName cannot be null.");
@@ -5155,6 +7225,9 @@ var spine;
             }
             return null;
         };
+        /** Finds a transform constraint by comparing each transform constraint's name. It is more efficient to cache the results of
+         * this method than to call it multiple times.
+         * @return May be null. */
         SkeletonData.prototype.findTransformConstraint = function (constraintName) {
             if (constraintName == null)
                 throw new Error("constraintName cannot be null.");
@@ -5166,6 +7239,9 @@ var spine;
             }
             return null;
         };
+        /** Finds a path constraint by comparing each path constraint's name. It is more efficient to cache the results of this method
+         * than to call it multiple times.
+         * @return May be null. */
         SkeletonData.prototype.findPathConstraint = function (constraintName) {
             if (constraintName == null)
                 throw new Error("constraintName cannot be null.");
@@ -5192,9 +7268,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -5207,21 +7283,58 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Loads skeleton data in the Spine JSON format.
+     *
+     * See [Spine JSON format](http://esotericsoftware.com/spine-json-format) and
+     * [JSON and binary data](http://esotericsoftware.com/spine-loading-skeleton-data#JSON-and-binary-data) in the Spine
+     * Runtimes Guide. */
     var SkeletonJson = /** @class */ (function () {
         function SkeletonJson(attachmentLoader) {
+            /** Scales bone positions, image sizes, and translations as they are loaded. This allows different size images to be used at
+             * runtime than were used in Spine.
+             *
+             * See [Scaling](http://esotericsoftware.com/spine-loading-skeleton-data#Scaling) in the Spine Runtimes Guide. */
             this.scale = 1;
             this.linkedMeshes = new Array();
             this.attachmentLoader = attachmentLoader;
@@ -5235,6 +7348,10 @@ var spine;
             if (skeletonMap != null) {
                 skeletonData.hash = skeletonMap.hash;
                 skeletonData.version = skeletonMap.spine;
+                if ("3.8.75" == skeletonData.version)
+                    throw new Error("Unsupported skeleton data, please export with a newer version of Spine.");
+                skeletonData.x = skeletonMap.x;
+                skeletonData.y = skeletonMap.y;
                 skeletonData.width = skeletonMap.width;
                 skeletonData.height = skeletonMap.height;
                 skeletonData.fps = skeletonMap.fps;
@@ -5244,14 +7361,14 @@ var spine;
             if (root.bones) {
                 for (var i = 0; i < root.bones.length; i++) {
                     var boneMap = root.bones[i];
-                    var parent_2 = null;
+                    var parent_5 = null;
                     var parentName = this.getValue(boneMap, "parent", null);
                     if (parentName != null) {
-                        parent_2 = skeletonData.findBone(parentName);
-                        if (parent_2 == null)
+                        parent_5 = skeletonData.findBone(parentName);
+                        if (parent_5 == null)
                             throw new Error("Parent bone not found: " + parentName);
                     }
-                    var data = new spine.BoneData(skeletonData.bones.length, boneMap.name, parent_2);
+                    var data = new spine.BoneData(skeletonData.bones.length, boneMap.name, parent_5);
                     data.length = this.getValue(boneMap, "length", 0) * scale;
                     data.x = this.getValue(boneMap, "x", 0) * scale;
                     data.y = this.getValue(boneMap, "y", 0) * scale;
@@ -5261,6 +7378,7 @@ var spine;
                     data.shearX = this.getValue(boneMap, "shearX", 0);
                     data.shearY = this.getValue(boneMap, "shearY", 0);
                     data.transformMode = SkeletonJson.transformModeFromString(this.getValue(boneMap, "transform", "normal"));
+                    data.skinRequired = this.getValue(boneMap, "skin", false);
                     skeletonData.bones.push(data);
                 }
             }
@@ -5293,6 +7411,7 @@ var spine;
                     var constraintMap = root.ik[i];
                     var data = new spine.IkConstraintData(constraintMap.name);
                     data.order = this.getValue(constraintMap, "order", 0);
+                    data.skinRequired = this.getValue(constraintMap, "skin", false);
                     for (var j = 0; j < constraintMap.bones.length; j++) {
                         var boneName = constraintMap.bones[j];
                         var bone = skeletonData.findBone(boneName);
@@ -5305,6 +7424,7 @@ var spine;
                     if (data.target == null)
                         throw new Error("IK target bone not found: " + targetName);
                     data.mix = this.getValue(constraintMap, "mix", 1);
+                    data.softness = this.getValue(constraintMap, "softness", 0) * scale;
                     data.bendDirection = this.getValue(constraintMap, "bendPositive", true) ? 1 : -1;
                     data.compress = this.getValue(constraintMap, "compress", false);
                     data.stretch = this.getValue(constraintMap, "stretch", false);
@@ -5318,6 +7438,7 @@ var spine;
                     var constraintMap = root.transform[i];
                     var data = new spine.TransformConstraintData(constraintMap.name);
                     data.order = this.getValue(constraintMap, "order", 0);
+                    data.skinRequired = this.getValue(constraintMap, "skin", false);
                     for (var j = 0; j < constraintMap.bones.length; j++) {
                         var boneName = constraintMap.bones[j];
                         var bone = skeletonData.findBone(boneName);
@@ -5350,6 +7471,7 @@ var spine;
                     var constraintMap = root.path[i];
                     var data = new spine.PathConstraintData(constraintMap.name);
                     data.order = this.getValue(constraintMap, "order", 0);
+                    data.skinRequired = this.getValue(constraintMap, "skin", false);
                     for (var j = 0; j < constraintMap.bones.length; j++) {
                         var boneName = constraintMap.bones[j];
                         var bone = skeletonData.findBone(boneName);
@@ -5378,18 +7500,50 @@ var spine;
             }
             // Skins.
             if (root.skins) {
-                for (var skinName in root.skins) {
-                    var skinMap = root.skins[skinName];
-                    var skin = new spine.Skin(skinName);
-                    for (var slotName in skinMap) {
-                        var slotIndex = skeletonData.findSlotIndex(slotName);
-                        if (slotIndex == -1)
+                for (var i = 0; i < root.skins.length; i++) {
+                    var skinMap = root.skins[i];
+                    var skin = new spine.Skin(skinMap.name);
+                    if (skinMap.bones) {
+                        for (var ii = 0; ii < skinMap.bones.length; ii++) {
+                            var bone = skeletonData.findBone(skinMap.bones[ii]);
+                            if (bone == null)
+                                throw new Error("Skin bone not found: " + skinMap.bones[i]);
+                            skin.bones.push(bone);
+                        }
+                    }
+                    if (skinMap.ik) {
+                        for (var ii = 0; ii < skinMap.ik.length; ii++) {
+                            var constraint = skeletonData.findIkConstraint(skinMap.ik[ii]);
+                            if (constraint == null)
+                                throw new Error("Skin IK constraint not found: " + skinMap.ik[i]);
+                            skin.constraints.push(constraint);
+                        }
+                    }
+                    if (skinMap.transform) {
+                        for (var ii = 0; ii < skinMap.transform.length; ii++) {
+                            var constraint = skeletonData.findTransformConstraint(skinMap.transform[ii]);
+                            if (constraint == null)
+                                throw new Error("Skin transform constraint not found: " + skinMap.transform[i]);
+                            skin.constraints.push(constraint);
+                        }
+                    }
+                    if (skinMap.path) {
+                        for (var ii = 0; ii < skinMap.path.length; ii++) {
+                            var constraint = skeletonData.findPathConstraint(skinMap.path[ii]);
+                            if (constraint == null)
+                                throw new Error("Skin path constraint not found: " + skinMap.path[i]);
+                            skin.constraints.push(constraint);
+                        }
+                    }
+                    for (var slotName in skinMap.attachments) {
+                        var slot = skeletonData.findSlot(slotName);
+                        if (slot == null)
                             throw new Error("Slot not found: " + slotName);
-                        var slotMap = skinMap[slotName];
+                        var slotMap = skinMap.attachments[slotName];
                         for (var entryName in slotMap) {
-                            var attachment = this.readAttachment(slotMap[entryName], skin, slotIndex, entryName, skeletonData);
+                            var attachment = this.readAttachment(slotMap[entryName], skin, slot.index, entryName, skeletonData);
                             if (attachment != null)
-                                skin.addAttachment(slotIndex, entryName, attachment);
+                                skin.setAttachment(slot.index, entryName, attachment);
                         }
                     }
                     skeletonData.skins.push(skin);
@@ -5403,10 +7557,11 @@ var spine;
                 var skin = linkedMesh.skin == null ? skeletonData.defaultSkin : skeletonData.findSkin(linkedMesh.skin);
                 if (skin == null)
                     throw new Error("Skin not found: " + linkedMesh.skin);
-                var parent_3 = skin.getAttachment(linkedMesh.slotIndex, linkedMesh.parent);
-                if (parent_3 == null)
+                var parent_6 = skin.getAttachment(linkedMesh.slotIndex, linkedMesh.parent);
+                if (parent_6 == null)
                     throw new Error("Parent mesh not found: " + linkedMesh.parent);
-                linkedMesh.mesh.setParentMesh(parent_3);
+                linkedMesh.mesh.deformAttachment = linkedMesh.inheritDeform ? parent_6 : linkedMesh.mesh;
+                linkedMesh.mesh.setParentMesh(parent_6);
                 linkedMesh.mesh.updateUVs();
             }
             this.linkedMeshes.length = 0;
@@ -5479,10 +7634,11 @@ var spine;
                     var color = this.getValue(map, "color", null);
                     if (color != null)
                         mesh.color.setFromString(color);
-                    var parent_4 = this.getValue(map, "parent", null);
-                    if (parent_4 != null) {
-                        mesh.inheritDeform = this.getValue(map, "deform", true);
-                        this.linkedMeshes.push(new LinkedMesh(mesh, this.getValue(map, "skin", null), slotIndex, parent_4));
+                    mesh.width = this.getValue(map, "width", 0) * scale;
+                    mesh.height = this.getValue(map, "height", 0) * scale;
+                    var parent_7 = this.getValue(map, "parent", null);
+                    if (parent_7 != null) {
+                        this.linkedMeshes.push(new LinkedMesh(mesh, this.getValue(map, "skin", null), slotIndex, parent_7, this.getValue(map, "deform", true)));
                         return mesh;
                     }
                     var uvs = map.uvs;
@@ -5490,6 +7646,7 @@ var spine;
                     mesh.triangles = map.triangles;
                     mesh.regionUVs = uvs;
                     mesh.updateUVs();
+                    mesh.edges = this.getValue(map, "edges", null);
                     mesh.hullLength = this.getValue(map, "hull", 0) * 2;
                     return mesh;
                 }
@@ -5590,7 +7747,7 @@ var spine;
                             var frameIndex = 0;
                             for (var i = 0; i < timelineMap.length; i++) {
                                 var valueMap = timelineMap[i];
-                                timeline.setFrame(frameIndex++, valueMap.time, valueMap.name);
+                                timeline.setFrame(frameIndex++, this.getValue(valueMap, "time", 0), valueMap.name);
                             }
                             timelines.push(timeline);
                             duration = Math.max(duration, timeline.frames[timeline.getFrameCount() - 1]);
@@ -5603,7 +7760,7 @@ var spine;
                                 var valueMap = timelineMap[i];
                                 var color = new spine.Color();
                                 color.setFromString(valueMap.color);
-                                timeline.setFrame(frameIndex, valueMap.time, color.r, color.g, color.b, color.a);
+                                timeline.setFrame(frameIndex, this.getValue(valueMap, "time", 0), color.r, color.g, color.b, color.a);
                                 this.readCurve(valueMap, timeline, frameIndex);
                                 frameIndex++;
                             }
@@ -5620,7 +7777,7 @@ var spine;
                                 var dark = new spine.Color();
                                 light.setFromString(valueMap.light);
                                 dark.setFromString(valueMap.dark);
-                                timeline.setFrame(frameIndex, valueMap.time, light.r, light.g, light.b, light.a, dark.r, dark.g, dark.b);
+                                timeline.setFrame(frameIndex, this.getValue(valueMap, "time", 0), light.r, light.g, light.b, light.a, dark.r, dark.g, dark.b);
                                 this.readCurve(valueMap, timeline, frameIndex);
                                 frameIndex++;
                             }
@@ -5647,7 +7804,7 @@ var spine;
                             var frameIndex = 0;
                             for (var i = 0; i < timelineMap.length; i++) {
                                 var valueMap = timelineMap[i];
-                                timeline.setFrame(frameIndex, valueMap.time, valueMap.angle);
+                                timeline.setFrame(frameIndex, this.getValue(valueMap, "time", 0), this.getValue(valueMap, "angle", 0));
                                 this.readCurve(valueMap, timeline, frameIndex);
                                 frameIndex++;
                             }
@@ -5656,9 +7813,11 @@ var spine;
                         }
                         else if (timelineName === "translate" || timelineName === "scale" || timelineName === "shear") {
                             var timeline = null;
-                            var timelineScale = 1;
-                            if (timelineName === "scale")
+                            var timelineScale = 1, defaultValue = 0;
+                            if (timelineName === "scale") {
                                 timeline = new spine.ScaleTimeline(timelineMap.length);
+                                defaultValue = 1;
+                            }
                             else if (timelineName === "shear")
                                 timeline = new spine.ShearTimeline(timelineMap.length);
                             else {
@@ -5669,8 +7828,8 @@ var spine;
                             var frameIndex = 0;
                             for (var i = 0; i < timelineMap.length; i++) {
                                 var valueMap = timelineMap[i];
-                                var x = this.getValue(valueMap, "x", 0), y = this.getValue(valueMap, "y", 0);
-                                timeline.setFrame(frameIndex, valueMap.time, x * timelineScale, y * timelineScale);
+                                var x = this.getValue(valueMap, "x", defaultValue), y = this.getValue(valueMap, "y", defaultValue);
+                                timeline.setFrame(frameIndex, this.getValue(valueMap, "time", 0), x * timelineScale, y * timelineScale);
                                 this.readCurve(valueMap, timeline, frameIndex);
                                 frameIndex++;
                             }
@@ -5692,7 +7851,7 @@ var spine;
                     var frameIndex = 0;
                     for (var i = 0; i < constraintMap.length; i++) {
                         var valueMap = constraintMap[i];
-                        timeline.setFrame(frameIndex, valueMap.time, this.getValue(valueMap, "mix", 1), this.getValue(valueMap, "bendPositive", true) ? 1 : -1, this.getValue(valueMap, "compress", false), this.getValue(valueMap, "stretch", false));
+                        timeline.setFrame(frameIndex, this.getValue(valueMap, "time", 0), this.getValue(valueMap, "mix", 1), this.getValue(valueMap, "softness", 0) * scale, this.getValue(valueMap, "bendPositive", true) ? 1 : -1, this.getValue(valueMap, "compress", false), this.getValue(valueMap, "stretch", false));
                         this.readCurve(valueMap, timeline, frameIndex);
                         frameIndex++;
                     }
@@ -5710,7 +7869,7 @@ var spine;
                     var frameIndex = 0;
                     for (var i = 0; i < constraintMap.length; i++) {
                         var valueMap = constraintMap[i];
-                        timeline.setFrame(frameIndex, valueMap.time, this.getValue(valueMap, "rotateMix", 1), this.getValue(valueMap, "translateMix", 1), this.getValue(valueMap, "scaleMix", 1), this.getValue(valueMap, "shearMix", 1));
+                        timeline.setFrame(frameIndex, this.getValue(valueMap, "time", 0), this.getValue(valueMap, "rotateMix", 1), this.getValue(valueMap, "translateMix", 1), this.getValue(valueMap, "scaleMix", 1), this.getValue(valueMap, "shearMix", 1));
                         this.readCurve(valueMap, timeline, frameIndex);
                         frameIndex++;
                     }
@@ -5719,9 +7878,9 @@ var spine;
                 }
             }
             // Path constraint timelines.
-            if (map.paths) {
-                for (var constraintName in map.paths) {
-                    var constraintMap = map.paths[constraintName];
+            if (map.path) {
+                for (var constraintName in map.path) {
+                    var constraintMap = map.path[constraintName];
                     var index = skeletonData.findPathConstraintIndex(constraintName);
                     if (index == -1)
                         throw new Error("Path constraint not found: " + constraintName);
@@ -5745,7 +7904,7 @@ var spine;
                             var frameIndex = 0;
                             for (var i = 0; i < timelineMap.length; i++) {
                                 var valueMap = timelineMap[i];
-                                timeline.setFrame(frameIndex, valueMap.time, this.getValue(valueMap, timelineName, 0) * timelineScale);
+                                timeline.setFrame(frameIndex, this.getValue(valueMap, "time", 0), this.getValue(valueMap, timelineName, 0) * timelineScale);
                                 this.readCurve(valueMap, timeline, frameIndex);
                                 frameIndex++;
                             }
@@ -5758,7 +7917,7 @@ var spine;
                             var frameIndex = 0;
                             for (var i = 0; i < timelineMap.length; i++) {
                                 var valueMap = timelineMap[i];
-                                timeline.setFrame(frameIndex, valueMap.time, this.getValue(valueMap, "rotateMix", 1), this.getValue(valueMap, "translateMix", 1));
+                                timeline.setFrame(frameIndex, this.getValue(valueMap, "time", 0), this.getValue(valueMap, "rotateMix", 1), this.getValue(valueMap, "translateMix", 1));
                                 this.readCurve(valueMap, timeline, frameIndex);
                                 frameIndex++;
                             }
@@ -5811,7 +7970,7 @@ var spine;
                                             deform[i] += vertices[i];
                                     }
                                 }
-                                timeline.setFrame(frameIndex, valueMap.time, deform);
+                                timeline.setFrame(frameIndex, this.getValue(valueMap, "time", 0), deform);
                                 this.readCurve(valueMap, timeline, frameIndex);
                                 frameIndex++;
                             }
@@ -5856,7 +8015,7 @@ var spine;
                             if (drawOrder[i] == -1)
                                 drawOrder[i] = unchanged[--unchangedIndex];
                     }
-                    timeline.setFrame(frameIndex++, drawOrderMap.time, drawOrder);
+                    timeline.setFrame(frameIndex++, this.getValue(drawOrderMap, "time", 0), drawOrder);
                 }
                 timelines.push(timeline);
                 duration = Math.max(duration, timeline.frames[timeline.getFrameCount() - 1]);
@@ -5870,15 +8029,15 @@ var spine;
                     var eventData = skeletonData.findEvent(eventMap.name);
                     if (eventData == null)
                         throw new Error("Event not found: " + eventMap.name);
-                    var event_5 = new spine.Event(spine.Utils.toSinglePrecision(eventMap.time), eventData);
-                    event_5.intValue = this.getValue(eventMap, "int", eventData.intValue);
-                    event_5.floatValue = this.getValue(eventMap, "float", eventData.floatValue);
-                    event_5.stringValue = this.getValue(eventMap, "string", eventData.stringValue);
-                    if (event_5.data.audioPath != null) {
-                        event_5.volume = this.getValue(eventMap, "volume", 1);
-                        event_5.balance = this.getValue(eventMap, "balance", 0);
+                    var event_6 = new spine.Event(spine.Utils.toSinglePrecision(this.getValue(eventMap, "time", 0)), eventData);
+                    event_6.intValue = this.getValue(eventMap, "int", eventData.intValue);
+                    event_6.floatValue = this.getValue(eventMap, "float", eventData.floatValue);
+                    event_6.stringValue = this.getValue(eventMap, "string", eventData.stringValue);
+                    if (event_6.data.audioPath != null) {
+                        event_6.volume = this.getValue(eventMap, "volume", 1);
+                        event_6.balance = this.getValue(eventMap, "balance", 0);
                     }
-                    timeline.setFrame(frameIndex++, event_5);
+                    timeline.setFrame(frameIndex++, event_6);
                 }
                 timelines.push(timeline);
                 duration = Math.max(duration, timeline.frames[timeline.getFrameCount() - 1]);
@@ -5889,13 +8048,13 @@ var spine;
             skeletonData.animations.push(new spine.Animation(name, timelines, duration));
         };
         SkeletonJson.prototype.readCurve = function (map, timeline, frameIndex) {
-            if (!map.curve)
+            if (!map.hasOwnProperty("curve"))
                 return;
-            if (map.curve === "stepped")
+            if (map.curve == "stepped")
                 timeline.setStepped(frameIndex);
-            else if (Object.prototype.toString.call(map.curve) === '[object Array]') {
+            else {
                 var curve = map.curve;
-                timeline.setCurve(frameIndex, curve[0], curve[1], curve[2], curve[3]);
+                timeline.setCurve(frameIndex, curve, this.getValue(map, "c2", 0), this.getValue(map, "c3", 1), this.getValue(map, "c4", 1));
             }
         };
         SkeletonJson.prototype.getValue = function (map, prop, defaultValue) {
@@ -5959,20 +8118,21 @@ var spine;
     }());
     spine.SkeletonJson = SkeletonJson;
     var LinkedMesh = /** @class */ (function () {
-        function LinkedMesh(mesh, skin, slotIndex, parent) {
+        function LinkedMesh(mesh, skin, slotIndex, parent, inheritDeform) {
             this.mesh = mesh;
             this.skin = skin;
             this.slotIndex = slotIndex;
             this.parent = parent;
+            this.inheritDeform = inheritDeform;
         }
         return LinkedMesh;
     }());
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -5985,27 +8145,72 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Stores an entry in the skin consisting of the slot index, name, and attachment **/
+    var SkinEntry = /** @class */ (function () {
+        function SkinEntry(slotIndex, name, attachment) {
+            this.slotIndex = slotIndex;
+            this.name = name;
+            this.attachment = attachment;
+        }
+        return SkinEntry;
+    }());
+    spine.SkinEntry = SkinEntry;
+    /** Stores attachments by slot index and attachment name.
+     *
+     * See SkeletonData {@link SkeletonData#defaultSkin}, Skeleton {@link Skeleton#skin}, and
+     * [Runtime skins](http://esotericsoftware.com/spine-runtime-skins) in the Spine Runtimes Guide. */
     var Skin = /** @class */ (function () {
         function Skin(name) {
             this.attachments = new Array();
+            this.bones = Array();
+            this.constraints = new Array();
             if (name == null)
                 throw new Error("name cannot be null.");
             this.name = name;
         }
-        Skin.prototype.addAttachment = function (slotIndex, name, attachment) {
+        /** Adds an attachment to the skin for the specified slot index and name. */
+        Skin.prototype.setAttachment = function (slotIndex, name, attachment) {
             if (attachment == null)
                 throw new Error("attachment cannot be null.");
             var attachments = this.attachments;
@@ -6015,10 +8220,122 @@ var spine;
                 attachments[slotIndex] = {};
             attachments[slotIndex][name] = attachment;
         };
-        /** @return May be null. */
+        /** Adds all attachments, bones, and constraints from the specified skin to this skin. */
+        Skin.prototype.addSkin = function (skin) {
+            for (var i = 0; i < skin.bones.length; i++) {
+                var bone = skin.bones[i];
+                var contained = false;
+                for (var j = 0; j < this.bones.length; j++) {
+                    if (this.bones[j] == bone) {
+                        contained = true;
+                        break;
+                    }
+                }
+                if (!contained)
+                    this.bones.push(bone);
+            }
+            for (var i = 0; i < skin.constraints.length; i++) {
+                var constraint = skin.constraints[i];
+                var contained = false;
+                for (var j = 0; j < this.constraints.length; j++) {
+                    if (this.constraints[j] == constraint) {
+                        contained = true;
+                        break;
+                    }
+                }
+                if (!contained)
+                    this.constraints.push(constraint);
+            }
+            var attachments = skin.getAttachments();
+            for (var i = 0; i < attachments.length; i++) {
+                var attachment = attachments[i];
+                this.setAttachment(attachment.slotIndex, attachment.name, attachment.attachment);
+            }
+        };
+        /** Adds all bones and constraints and copies of all attachments from the specified skin to this skin. Mesh attachments are not
+         * copied, instead a new linked mesh is created. The attachment copies can be modified without affecting the originals. */
+        Skin.prototype.copySkin = function (skin) {
+            for (var i = 0; i < skin.bones.length; i++) {
+                var bone = skin.bones[i];
+                var contained = false;
+                for (var j = 0; j < this.bones.length; j++) {
+                    if (this.bones[j] == bone) {
+                        contained = true;
+                        break;
+                    }
+                }
+                if (!contained)
+                    this.bones.push(bone);
+            }
+            for (var i = 0; i < skin.constraints.length; i++) {
+                var constraint = skin.constraints[i];
+                var contained = false;
+                for (var j = 0; j < this.constraints.length; j++) {
+                    if (this.constraints[j] == constraint) {
+                        contained = true;
+                        break;
+                    }
+                }
+                if (!contained)
+                    this.constraints.push(constraint);
+            }
+            var attachments = skin.getAttachments();
+            for (var i = 0; i < attachments.length; i++) {
+                var attachment = attachments[i];
+                if (attachment.attachment == null)
+                    continue;
+                if (attachment.attachment instanceof spine.MeshAttachment) {
+                    attachment.attachment = attachment.attachment.newLinkedMesh();
+                    this.setAttachment(attachment.slotIndex, attachment.name, attachment.attachment);
+                }
+                else {
+                    attachment.attachment = attachment.attachment.copy();
+                    this.setAttachment(attachment.slotIndex, attachment.name, attachment.attachment);
+                }
+            }
+        };
+        /** Returns the attachment for the specified slot index and name, or null. */
         Skin.prototype.getAttachment = function (slotIndex, name) {
             var dictionary = this.attachments[slotIndex];
             return dictionary ? dictionary[name] : null;
+        };
+        /** Removes the attachment in the skin for the specified slot index and name, if any. */
+        Skin.prototype.removeAttachment = function (slotIndex, name) {
+            var dictionary = this.attachments[slotIndex];
+            if (dictionary)
+                dictionary[name] = null;
+        };
+        /** Returns all attachments in this skin. */
+        Skin.prototype.getAttachments = function () {
+            var entries = new Array();
+            for (var i = 0; i < this.attachments.length; i++) {
+                var slotAttachments = this.attachments[i];
+                if (slotAttachments) {
+                    for (var name_4 in slotAttachments) {
+                        var attachment = slotAttachments[name_4];
+                        if (attachment)
+                            entries.push(new SkinEntry(i, name_4, attachment));
+                    }
+                }
+            }
+            return entries;
+        };
+        /** Returns all attachments in this skin for the specified slot index. */
+        Skin.prototype.getAttachmentsForSlot = function (slotIndex, attachments) {
+            var slotAttachments = this.attachments[slotIndex];
+            if (slotAttachments) {
+                for (var name_5 in slotAttachments) {
+                    var attachment = slotAttachments[name_5];
+                    if (attachment)
+                        attachments.push(new SkinEntry(slotIndex, name_5, attachment));
+                }
+            }
+        };
+        /** Clears all attachments, bones, and constraints. */
+        Skin.prototype.clear = function () {
+            this.attachments.length = 0;
+            this.bones.length = 0;
+            this.constraints.length = 0;
         };
         /** Attach each attachment in this skin if the corresponding attachment in the old skin is currently attached. */
         Skin.prototype.attachAll = function (skeleton, oldSkin) {
@@ -6047,9 +8364,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -6062,22 +8379,57 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Stores a slot's current pose. Slots organize attachments for {@link Skeleton#drawOrder} purposes and provide a place to store
+     * state for an attachment. State cannot be stored in an attachment itself because attachments are stateless and may be shared
+     * across multiple skeletons. */
     var Slot = /** @class */ (function () {
         function Slot(data, bone) {
-            this.attachmentVertices = new Array();
+            /** Values to deform the slot's attachment. For an unweighted mesh, the entries are local positions for each vertex. For a
+             * weighted mesh, the entries are an offset for each vertex which will be added to the mesh's local vertex positions.
+             *
+             * See {@link VertexAttachment#computeWorldVertices()} and {@link DeformTimeline}. */
+            this.deform = new Array();
             if (data == null)
                 throw new Error("data cannot be null.");
             if (bone == null)
@@ -6088,26 +8440,32 @@ var spine;
             this.darkColor = data.darkColor == null ? null : new spine.Color();
             this.setToSetupPose();
         }
-        /** @return May be null. */
+        /** The skeleton this slot belongs to. */
+        Slot.prototype.getSkeleton = function () {
+            return this.bone.skeleton;
+        };
+        /** The current attachment for the slot, or null if the slot has no attachment. */
         Slot.prototype.getAttachment = function () {
             return this.attachment;
         };
-        /** Sets the attachment and if it changed, resets {@link #getAttachmentTime()} and clears {@link #getAttachmentVertices()}.
+        /** Sets the slot's attachment and, if the attachment changed, resets {@link #attachmentTime} and clears {@link #deform}.
          * @param attachment May be null. */
         Slot.prototype.setAttachment = function (attachment) {
             if (this.attachment == attachment)
                 return;
             this.attachment = attachment;
             this.attachmentTime = this.bone.skeleton.time;
-            this.attachmentVertices.length = 0;
+            this.deform.length = 0;
         };
         Slot.prototype.setAttachmentTime = function (time) {
             this.attachmentTime = this.bone.skeleton.time - time;
         };
-        /** Returns the time since the attachment was set. */
+        /** The time that has elapsed since the last time the attachment was set or cleared. Relies on Skeleton
+         * {@link Skeleton#time}. */
         Slot.prototype.getAttachmentTime = function () {
             return this.bone.skeleton.time - this.attachmentTime;
         };
+        /** Sets this slot to the setup pose. */
         Slot.prototype.setToSetupPose = function () {
             this.color.setFromColor(this.data.color);
             if (this.darkColor != null)
@@ -6125,9 +8483,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -6140,21 +8498,52 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Stores the setup pose for a {@link Slot}. */
     var SlotData = /** @class */ (function () {
         function SlotData(index, name, boneData) {
+            /** The color used to tint the slot's attachment. If {@link #getDarkColor()} is set, this is used as the light color for two
+             * color tinting. */
             this.color = new spine.Color(1, 1, 1, 1);
             if (index < 0)
                 throw new Error("index must be >= 0.");
@@ -6172,9 +8561,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -6187,18 +8576,46 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
     var Texture = /** @class */ (function () {
         function Texture(image) {
@@ -6277,9 +8694,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -6292,18 +8709,46 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
     var TextureAtlas = /** @class */ (function () {
         function TextureAtlas(atlasText, textureLoader) {
@@ -6356,7 +8801,17 @@ var spine;
                     var region = new TextureAtlasRegion();
                     region.name = line;
                     region.page = page;
-                    region.rotate = reader.readValue() == "true";
+                    var rotateValue = reader.readValue();
+                    if (rotateValue.toLocaleLowerCase() == "true") {
+                        region.degrees = 90;
+                    }
+                    else if (rotateValue.toLocaleLowerCase() == "false") {
+                        region.degrees = 0;
+                    }
+                    else {
+                        region.degrees = parseFloat(rotateValue);
+                    }
+                    region.rotate = region.degrees == 90;
                     reader.readTuple(tuple);
                     var x = parseInt(tuple[0]);
                     var y = parseInt(tuple[1]);
@@ -6463,9 +8918,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -6478,26 +8933,63 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** Stores the current pose for a transform constraint. A transform constraint adjusts the world transform of the constrained
+     * bones to match that of the target bone.
+     *
+     * See [Transform constraints](http://esotericsoftware.com/spine-transform-constraints) in the Spine User Guide. */
     var TransformConstraint = /** @class */ (function () {
         function TransformConstraint(data, skeleton) {
+            /** A percentage (0-1) that controls the mix between the constrained and unconstrained rotations. */
             this.rotateMix = 0;
+            /** A percentage (0-1) that controls the mix between the constrained and unconstrained translations. */
             this.translateMix = 0;
+            /** A percentage (0-1) that controls the mix between the constrained and unconstrained scales. */
             this.scaleMix = 0;
+            /** A percentage (0-1) that controls the mix between the constrained and unconstrained scales. */
             this.shearMix = 0;
             this.temp = new spine.Vector2();
+            this.active = false;
             if (data == null)
                 throw new Error("data cannot be null.");
             if (skeleton == null)
@@ -6512,6 +9004,10 @@ var spine;
                 this.bones.push(skeleton.findBone(data.bones[i].name));
             this.target = skeleton.findBone(data.target.name);
         }
+        TransformConstraint.prototype.isActive = function () {
+            return this.active;
+        };
+        /** Applies the constraint to the constrained bones. */
         TransformConstraint.prototype.apply = function () {
             this.update();
         };
@@ -6721,18 +9217,15 @@ var spine;
                 bone.updateWorldTransformWith(x, y, rotation, scaleX, scaleY, bone.ashearX, shearY);
             }
         };
-        TransformConstraint.prototype.getOrder = function () {
-            return this.data.order;
-        };
         return TransformConstraint;
     }());
     spine.TransformConstraint = TransformConstraint;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -6745,48 +9238,89 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
-    var TransformConstraintData = /** @class */ (function () {
+    /** Stores the setup pose for a {@link TransformConstraint}.
+     *
+     * See [Transform constraints](http://esotericsoftware.com/spine-transform-constraints) in the Spine User Guide. */
+    var TransformConstraintData = /** @class */ (function (_super) {
+        __extends(TransformConstraintData, _super);
         function TransformConstraintData(name) {
-            this.order = 0;
-            this.bones = new Array();
-            this.rotateMix = 0;
-            this.translateMix = 0;
-            this.scaleMix = 0;
-            this.shearMix = 0;
-            this.offsetRotation = 0;
-            this.offsetX = 0;
-            this.offsetY = 0;
-            this.offsetScaleX = 0;
-            this.offsetScaleY = 0;
-            this.offsetShearY = 0;
-            this.relative = false;
-            this.local = false;
-            if (name == null)
-                throw new Error("name cannot be null.");
-            this.name = name;
+            var _this = _super.call(this, name, 0, false) || this;
+            /** The bones that will be modified by this transform constraint. */
+            _this.bones = new Array();
+            /** A percentage (0-1) that controls the mix between the constrained and unconstrained rotations. */
+            _this.rotateMix = 0;
+            /** A percentage (0-1) that controls the mix between the constrained and unconstrained translations. */
+            _this.translateMix = 0;
+            /** A percentage (0-1) that controls the mix between the constrained and unconstrained scales. */
+            _this.scaleMix = 0;
+            /** A percentage (0-1) that controls the mix between the constrained and unconstrained shears. */
+            _this.shearMix = 0;
+            /** An offset added to the constrained bone rotation. */
+            _this.offsetRotation = 0;
+            /** An offset added to the constrained bone X translation. */
+            _this.offsetX = 0;
+            /** An offset added to the constrained bone Y translation. */
+            _this.offsetY = 0;
+            /** An offset added to the constrained bone scaleX. */
+            _this.offsetScaleX = 0;
+            /** An offset added to the constrained bone scaleY. */
+            _this.offsetScaleY = 0;
+            /** An offset added to the constrained bone shearY. */
+            _this.offsetShearY = 0;
+            _this.relative = false;
+            _this.local = false;
+            return _this;
         }
         return TransformConstraintData;
-    }());
+    }(spine.ConstraintData));
     spine.TransformConstraintData = TransformConstraintData;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -6799,18 +9333,46 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
     var Triangulator = /** @class */ (function () {
         function Triangulator() {
@@ -7031,9 +9593,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -7046,22 +9608,22 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -7074,18 +9636,46 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
     var IntSet = /** @class */ (function () {
         function IntSet() {
@@ -7168,6 +9758,17 @@ var spine;
             else if (this.a > 1)
                 this.a = 1;
             return this;
+        };
+        Color.rgba8888ToColor = function (color, value) {
+            color.r = ((value & 0xff000000) >>> 24) / 255;
+            color.g = ((value & 0x00ff0000) >>> 16) / 255;
+            color.b = ((value & 0x0000ff00) >>> 8) / 255;
+            color.a = ((value & 0x000000ff)) / 255;
+        };
+        Color.rgb888ToColor = function (color, value) {
+            color.r = ((value & 0x00ff0000) >>> 16) / 255;
+            color.g = ((value & 0x0000ff00) >>> 8) / 255;
+            color.b = ((value & 0x000000ff)) / 255;
         };
         Color.WHITE = new Color(1, 1, 1, 1);
         Color.RED = new Color(1, 0, 0, 1);
@@ -7321,6 +9922,14 @@ var spine;
         // This function is used to fix WebKit 602 specific issue described at http://esotericsoftware.com/forum/iOS-10-disappearing-graphics-10109
         Utils.webkit602BugfixHelper = function (alpha, blend) {
         };
+        Utils.contains = function (array, element, identity) {
+            if (identity === void 0) { identity = true; }
+            for (var i = 0; i < array.length; i++) {
+                if (array[i] == element)
+                    return true;
+            }
+            return false;
+        };
         Utils.SUPPORTS_TYPED_ARRAYS = typeof (Float32Array) !== "undefined";
         return Utils;
     }());
@@ -7352,9 +9961,7 @@ var spine;
         };
         Pool.prototype.freeAll = function (items) {
             for (var i = 0; i < items.length; i++) {
-                if (items[i].reset)
-                    items[i].reset();
-                this.items[i] = items[i];
+                this.free(items[i]);
             }
         };
         Pool.prototype.clear = function () {
@@ -7461,9 +10068,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -7476,22 +10083,22 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -7504,16 +10111,16 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 (function () {
     if (!Math.fround) {
@@ -7526,9 +10133,9 @@ var spine;
 })();
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -7541,19 +10148,48 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** The base class for all attachments. */
     var Attachment = /** @class */ (function () {
         function Attachment(name) {
             if (name == null)
@@ -7563,23 +10199,36 @@ var spine;
         return Attachment;
     }());
     spine.Attachment = Attachment;
+    /** Base class for an attachment with vertices that are transformed by one or more bones and can be deformed by a slot's
+     * {@link Slot#deform}. */
     var VertexAttachment = /** @class */ (function (_super) {
         __extends(VertexAttachment, _super);
         function VertexAttachment(name) {
             var _this = _super.call(this, name) || this;
+            /** The unique ID for this attachment. */
             _this.id = (VertexAttachment.nextID++ & 65535) << 11;
+            /** The maximum number of world vertex values that can be output by
+             * {@link #computeWorldVertices()} using the `count` parameter. */
             _this.worldVerticesLength = 0;
+            /** Deform keys for the deform attachment are also applied to this attachment. May be null if no deform keys should be applied. */
+            _this.deformAttachment = _this;
             return _this;
         }
-        /** Transforms local vertices to world coordinates.
-         * @param start The index of the first local vertex value to transform. Each vertex has 2 values, x and y.
-         * @param count The number of world vertex values to output. Must be <= {@link #getWorldVerticesLength()} - start.
-         * @param worldVertices The output world vertices. Must have a length >= offset + count.
-         * @param offset The worldVertices index to begin writing values. */
+        /** Transforms the attachment's local {@link vertices} to world coordinates. If the slot's {@link Slot#deform} is
+         * not empty, it is used to deform the vertices.
+         *
+         * See [World transforms](http://esotericsoftware.com/spine-runtime-skeletons#World-transforms) in the Spine
+         * Runtimes Guide.
+         * @param start The index of the first {@link #vertices} value to transform. Each vertex has 2 values, x and y.
+         * @param count The number of world vertex values to output. Must be <= {@link #worldVerticesLength} - `start`.
+         * @param worldVertices The output world vertices. Must have a length >= `offset` + `count` *
+         *           `stride` / 2.
+         * @param offset The `worldVertices` index to begin writing values.
+         * @param stride The number of `worldVertices` entries between the value pairs written. */
         VertexAttachment.prototype.computeWorldVertices = function (slot, start, count, worldVertices, offset, stride) {
             count = offset + (count >> 1) * stride;
             var skeleton = slot.bone.skeleton;
-            var deformArray = slot.attachmentVertices;
+            var deformArray = slot.deform;
             var vertices = this.vertices;
             var bones = this.bones;
             if (bones == null) {
@@ -7635,9 +10284,22 @@ var spine;
                 }
             }
         };
-        /** Returns true if a deform originally applied to the specified attachment should be applied to this attachment. */
-        VertexAttachment.prototype.applyDeform = function (sourceAttachment) {
-            return this == sourceAttachment;
+        /** Does not copy id (generated) or name (set on construction). **/
+        VertexAttachment.prototype.copyTo = function (attachment) {
+            if (this.bones != null) {
+                attachment.bones = new Array(this.bones.length);
+                spine.Utils.arrayCopy(this.bones, 0, attachment.bones, 0, this.bones.length);
+            }
+            else
+                attachment.bones = null;
+            if (this.vertices != null) {
+                attachment.vertices = spine.Utils.newFloatArray(this.vertices.length);
+                spine.Utils.arrayCopy(this.vertices, 0, attachment.vertices, 0, this.vertices.length);
+            }
+            else
+                attachment.vertices = null;
+            attachment.worldVerticesLength = this.worldVerticesLength;
+            attachment.deformAttachment = this.deformAttachment;
         };
         VertexAttachment.nextID = 0;
         return VertexAttachment;
@@ -7646,9 +10308,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -7661,22 +10323,22 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -7689,18 +10351,46 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
     var AttachmentType;
     (function (AttachmentType) {
@@ -7710,13 +10400,14 @@ var spine;
         AttachmentType[AttachmentType["LinkedMesh"] = 3] = "LinkedMesh";
         AttachmentType[AttachmentType["Path"] = 4] = "Path";
         AttachmentType[AttachmentType["Point"] = 5] = "Point";
+        AttachmentType[AttachmentType["Clipping"] = 6] = "Clipping";
     })(AttachmentType = spine.AttachmentType || (spine.AttachmentType = {}));
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -7729,19 +10420,52 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** An attachment with vertices that make up a polygon. Can be used for hit detection, creating physics bodies, spawning particle
+     * effects, and more.
+     *
+     * See {@link SkeletonBounds} and [Bounding Boxes](http://esotericsoftware.com/spine-bounding-boxes) in the Spine User
+     * Guide. */
     var BoundingBoxAttachment = /** @class */ (function (_super) {
         __extends(BoundingBoxAttachment, _super);
         function BoundingBoxAttachment(name) {
@@ -7749,15 +10473,21 @@ var spine;
             _this.color = new spine.Color(1, 1, 1, 1);
             return _this;
         }
+        BoundingBoxAttachment.prototype.copy = function () {
+            var copy = new BoundingBoxAttachment(name);
+            this.copyTo(copy);
+            copy.color.setFromColor(this.color);
+            return copy;
+        };
         return BoundingBoxAttachment;
     }(spine.VertexAttachment));
     spine.BoundingBoxAttachment = BoundingBoxAttachment;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -7770,36 +10500,74 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** An attachment with vertices that make up a polygon used for clipping the rendering of other attachments. */
     var ClippingAttachment = /** @class */ (function (_super) {
         __extends(ClippingAttachment, _super);
         function ClippingAttachment(name) {
             var _this = _super.call(this, name) || this;
             // Nonessential.
+            /** The color of the clipping polygon as it was in Spine. Available only when nonessential data was exported. Clipping polygons
+             * are not usually rendered at runtime. */
             _this.color = new spine.Color(0.2275, 0.2275, 0.8078, 1); // ce3a3aff
             return _this;
         }
+        ClippingAttachment.prototype.copy = function () {
+            var copy = new ClippingAttachment(name);
+            this.copyTo(copy);
+            copy.endSlot = this.endSlot;
+            copy.color.setFromColor(this.color);
+            return copy;
+        };
         return ClippingAttachment;
     }(spine.VertexAttachment));
     spine.ClippingAttachment = ClippingAttachment;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -7812,50 +10580,106 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** An attachment that displays a textured mesh. A mesh has hull vertices and internal vertices within the hull. Holes are not
+     * supported. Each vertex has UVs (texture coordinates) and triangles are used to map an image on to the mesh.
+     *
+     * See [Mesh attachments](http://esotericsoftware.com/spine-meshes) in the Spine User Guide. */
     var MeshAttachment = /** @class */ (function (_super) {
         __extends(MeshAttachment, _super);
         function MeshAttachment(name) {
             var _this = _super.call(this, name) || this;
+            /** The color to tint the mesh. */
             _this.color = new spine.Color(1, 1, 1, 1);
-            _this.inheritDeform = false;
             _this.tempColor = new spine.Color(0, 0, 0, 0);
             return _this;
         }
+        /** Calculates {@link #uvs} using {@link #regionUVs} and the {@link #region}. Must be called after changing the region UVs or
+         * region. */
         MeshAttachment.prototype.updateUVs = function () {
             var regionUVs = this.regionUVs;
             if (this.uvs == null || this.uvs.length != regionUVs.length)
                 this.uvs = spine.Utils.newFloatArray(regionUVs.length);
             var uvs = this.uvs;
-            var u = 0, v = 0, width = 0, height = 0;
+            var n = this.uvs.length;
+            var u = this.region.u, v = this.region.v, width = 0, height = 0;
             if (this.region instanceof spine.TextureAtlasRegion) {
                 var region = this.region;
                 var textureWidth = region.texture.getImage().width, textureHeight = region.texture.getImage().height;
-                if (region.rotate) {
-                    u = region.u - (region.originalHeight - region.offsetY - region.height) / textureWidth;
-                    v = region.v - (region.originalWidth - region.offsetX - region.width) / textureHeight;
-                    width = region.originalHeight / textureWidth;
-                    height = region.originalWidth / textureHeight;
-                    for (var i = 0, n = uvs.length; i < n; i += 2) {
-                        uvs[i] = u + regionUVs[i + 1] * width;
-                        uvs[i + 1] = v + height - regionUVs[i] * height;
-                    }
-                    return;
+                switch (region.degrees) {
+                    case 90:
+                        u -= (region.originalHeight - region.offsetY - region.height) / textureWidth;
+                        v -= (region.originalWidth - region.offsetX - region.width) / textureHeight;
+                        width = region.originalHeight / textureWidth;
+                        height = region.originalWidth / textureHeight;
+                        for (var i = 0; i < n; i += 2) {
+                            uvs[i] = u + regionUVs[i + 1] * width;
+                            uvs[i + 1] = v + (1 - regionUVs[i]) * height;
+                        }
+                        return;
+                    case 180:
+                        u -= (region.originalWidth - region.offsetX - region.width) / textureWidth;
+                        v -= region.offsetY / textureHeight;
+                        width = region.originalWidth / textureWidth;
+                        height = region.originalHeight / textureHeight;
+                        for (var i = 0; i < n; i += 2) {
+                            uvs[i] = u + (1 - regionUVs[i]) * width;
+                            uvs[i + 1] = v + (1 - regionUVs[i + 1]) * height;
+                        }
+                        return;
+                    case 270:
+                        u -= region.offsetY / textureWidth;
+                        v -= region.offsetX / textureHeight;
+                        width = region.originalHeight / textureWidth;
+                        height = region.originalWidth / textureHeight;
+                        for (var i = 0; i < n; i += 2) {
+                            uvs[i] = u + (1 - regionUVs[i + 1]) * width;
+                            uvs[i + 1] = v + regionUVs[i] * height;
+                        }
+                        return;
                 }
-                u = region.u - region.offsetX / textureWidth;
-                v = region.v - (region.originalHeight - region.offsetY - region.height) / textureHeight;
+                u -= region.offsetX / textureWidth;
+                v -= (region.originalHeight - region.offsetY - region.height) / textureHeight;
                 width = region.originalWidth / textureWidth;
                 height = region.originalHeight / textureHeight;
             }
@@ -7864,45 +10688,17 @@ var spine;
                 width = height = 1;
             }
             else {
-                u = this.region.u;
-                v = this.region.v;
                 width = this.region.u2 - u;
                 height = this.region.v2 - v;
             }
-            for (var i = 0, n = uvs.length; i < n; i += 2) {
+            for (var i = 0; i < n; i += 2) {
                 uvs[i] = u + regionUVs[i] * width;
                 uvs[i + 1] = v + regionUVs[i + 1] * height;
             }
         };
-        /*updateUVs () {
-            let u = 0, v = 0, width = 0, height = 0;
-            if (this.region == null) {
-                u = v = 0;
-                width = height = 1;
-            } else {
-                u = this.region.u;
-                v = this.region.v;
-                width = this.region.u2 - u;
-                height = this.region.v2 - v;
-            }
-            let regionUVs = this.regionUVs;
-            if (this.uvs == null || this.uvs.length != regionUVs.length) this.uvs = Utils.newFloatArray(regionUVs.length);
-            let uvs = this.uvs;
-            if (this.region.rotate) {
-                for (let i = 0, n = uvs.length; i < n; i += 2) {
-                    uvs[i] = u + regionUVs[i + 1] * width;
-                    uvs[i + 1] = v + height - regionUVs[i] * height;
-                }
-            } else {
-                for (let i = 0, n = uvs.length; i < n; i += 2) {
-                    uvs[i] = u + regionUVs[i] * width;
-                    uvs[i + 1] = v + regionUVs[i + 1] * height;
-                }
-            }
-        }*/
-        MeshAttachment.prototype.applyDeform = function (sourceAttachment) {
-            return this == sourceAttachment || (this.inheritDeform && this.parentMesh == sourceAttachment);
-        };
+        /** The parent mesh if this is a linked mesh, else null. A linked mesh shares the {@link #bones}, {@link #vertices},
+         * {@link #regionUVs}, {@link #triangles}, {@link #hullLength}, {@link #edges}, {@link #width}, and {@link #height} with the
+         * parent mesh, but may have a different {@link #name} or {@link #path} (and therefore a different texture). */
         MeshAttachment.prototype.getParentMesh = function () {
             return this.parentMesh;
         };
@@ -7919,15 +10715,50 @@ var spine;
                 this.worldVerticesLength = parentMesh.worldVerticesLength;
             }
         };
+        MeshAttachment.prototype.copy = function () {
+            if (this.parentMesh != null)
+                return this.newLinkedMesh();
+            var copy = new MeshAttachment(this.name);
+            copy.region = this.region;
+            copy.path = this.path;
+            copy.color.setFromColor(this.color);
+            this.copyTo(copy);
+            copy.regionUVs = new Array(this.regionUVs.length);
+            spine.Utils.arrayCopy(this.regionUVs, 0, copy.regionUVs, 0, this.regionUVs.length);
+            copy.uvs = new Array(this.uvs.length);
+            spine.Utils.arrayCopy(this.uvs, 0, copy.uvs, 0, this.uvs.length);
+            copy.triangles = new Array(this.triangles.length);
+            spine.Utils.arrayCopy(this.triangles, 0, copy.triangles, 0, this.triangles.length);
+            copy.hullLength = this.hullLength;
+            // Nonessential.
+            if (this.edges != null) {
+                copy.edges = new Array(this.edges.length);
+                spine.Utils.arrayCopy(this.edges, 0, copy.edges, 0, this.edges.length);
+            }
+            copy.width = this.width;
+            copy.height = this.height;
+            return copy;
+        };
+        /** Returns a new mesh with the {@link #parentMesh} set to this mesh's parent mesh, if any, else to this mesh. **/
+        MeshAttachment.prototype.newLinkedMesh = function () {
+            var copy = new MeshAttachment(this.name);
+            copy.region = this.region;
+            copy.path = this.path;
+            copy.color.setFromColor(this.color);
+            copy.deformAttachment = this.deformAttachment;
+            copy.setParentMesh(this.parentMesh != null ? this.parentMesh : this);
+            copy.updateUVs();
+            return copy;
+        };
         return MeshAttachment;
     }(spine.VertexAttachment));
     spine.MeshAttachment = MeshAttachment;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -7940,37 +10771,83 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** An attachment whose vertices make up a composite Bezier curve.
+     *
+     * See {@link PathConstraint} and [Paths](http://esotericsoftware.com/spine-paths) in the Spine User Guide. */
     var PathAttachment = /** @class */ (function (_super) {
         __extends(PathAttachment, _super);
         function PathAttachment(name) {
             var _this = _super.call(this, name) || this;
+            /** If true, the start and end knots are connected. */
             _this.closed = false;
+            /** If true, additional calculations are performed to make calculating positions along the path more accurate. If false, fewer
+             * calculations are performed but calculating positions along the path is less accurate. */
             _this.constantSpeed = false;
+            /** The color of the path as it was in Spine. Available only when nonessential data was exported. Paths are not usually
+             * rendered at runtime. */
             _this.color = new spine.Color(1, 1, 1, 1);
             return _this;
         }
+        PathAttachment.prototype.copy = function () {
+            var copy = new PathAttachment(name);
+            this.copyTo(copy);
+            copy.lengths = new Array(this.lengths.length);
+            spine.Utils.arrayCopy(this.lengths, 0, copy.lengths, 0, this.lengths.length);
+            copy.closed = closed;
+            copy.constantSpeed = this.constantSpeed;
+            copy.color.setFromColor(this.color);
+            return copy;
+        };
         return PathAttachment;
     }(spine.VertexAttachment));
     spine.PathAttachment = PathAttachment;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -7983,23 +10860,58 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** An attachment which is a single point and a rotation. This can be used to spawn projectiles, particles, etc. A bone can be
+     * used in similar ways, but a PointAttachment is slightly less expensive to compute and can be hidden, shown, and placed in a
+     * skin.
+     *
+     * See [Point Attachments](http://esotericsoftware.com/spine-point-attachments) in the Spine User Guide. */
     var PointAttachment = /** @class */ (function (_super) {
         __extends(PointAttachment, _super);
         function PointAttachment(name) {
             var _this = _super.call(this, name) || this;
+            /** The color of the point attachment as it was in Spine. Available only when nonessential data was exported. Point attachments
+             * are not usually rendered at runtime. */
             _this.color = new spine.Color(0.38, 0.94, 0, 1);
             return _this;
         }
@@ -8014,15 +10926,23 @@ var spine;
             var y = cos * bone.c + sin * bone.d;
             return Math.atan2(y, x) * spine.MathUtils.radDeg;
         };
+        PointAttachment.prototype.copy = function () {
+            var copy = new PointAttachment(name);
+            copy.x = this.x;
+            copy.y = this.y;
+            copy.rotation = this.rotation;
+            copy.color.setFromColor(this.color);
+            return copy;
+        };
         return PointAttachment;
     }(spine.VertexAttachment));
     spine.PointAttachment = PointAttachment;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -8035,36 +10955,79 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
+    /** An attachment that displays a textured quadrilateral.
+     *
+     * See [Region attachments](http://esotericsoftware.com/spine-regions) in the Spine User Guide. */
     var RegionAttachment = /** @class */ (function (_super) {
         __extends(RegionAttachment, _super);
         function RegionAttachment(name) {
             var _this = _super.call(this, name) || this;
+            /** The local x translation. */
             _this.x = 0;
+            /** The local y translation. */
             _this.y = 0;
+            /** The local scaleX. */
             _this.scaleX = 1;
+            /** The local scaleY. */
             _this.scaleY = 1;
+            /** The local rotation. */
             _this.rotation = 0;
+            /** The width of the region attachment in Spine. */
             _this.width = 0;
+            /** The height of the region attachment in Spine. */
             _this.height = 0;
+            /** The color to tint the region attachment. */
             _this.color = new spine.Color(1, 1, 1, 1);
+            /** For each of the 4 vertices, a pair of <code>x,y</code> values that is the local position of the vertex.
+             *
+             * See {@link #updateOffset()}. */
             _this.offset = spine.Utils.newFloatArray(8);
             _this.uvs = spine.Utils.newFloatArray(8);
             _this.tempColor = new spine.Color(1, 1, 1, 1);
             return _this;
         }
+        /** Calculates the {@link #offset} using the region settings. Must be called after changing region settings. */
         RegionAttachment.prototype.updateOffset = function () {
             var regionScaleX = this.width / this.region.originalWidth * this.scaleX;
             var regionScaleY = this.height / this.region.originalHeight * this.scaleY;
@@ -8117,6 +11080,13 @@ var spine;
                 uvs[7] = region.v2;
             }
         };
+        /** Transforms the attachment's four vertices to world coordinates.
+         *
+         * See [World transforms](http://esotericsoftware.com/spine-runtime-skeletons#World-transforms) in the Spine
+         * Runtimes Guide.
+         * @param worldVertices The output world vertices. Must have a length >= `offset` + 8.
+         * @param offset The `worldVertices` index to begin writing values.
+         * @param stride The number of `worldVertices` entries between the value pairs written. */
         RegionAttachment.prototype.computeWorldVertices = function (bone, worldVertices, offset, stride) {
             var vertexOffset = this.offset;
             var x = bone.worldX, y = bone.worldY;
@@ -8141,6 +11111,23 @@ var spine;
             offsetY = vertexOffset[RegionAttachment.OY4];
             worldVertices[offset] = offsetX * a + offsetY * b + x; // ur
             worldVertices[offset + 1] = offsetX * c + offsetY * d + y;
+        };
+        RegionAttachment.prototype.copy = function () {
+            var copy = new RegionAttachment(this.name);
+            copy.region = this.region;
+            copy.rendererObject = this.rendererObject;
+            copy.path = this.path;
+            copy.x = this.x;
+            copy.y = this.y;
+            copy.scaleX = this.scaleX;
+            copy.scaleY = this.scaleY;
+            copy.rotation = this.rotation;
+            copy.width = this.width;
+            copy.height = this.height;
+            spine.Utils.arrayCopy(this.uvs, 0, copy.uvs, 0, 8);
+            spine.Utils.arrayCopy(this.offset, 0, copy.offset, 0, 8);
+            copy.color.setFromColor(this.color);
+            return copy;
         };
         RegionAttachment.OX1 = 0;
         RegionAttachment.OY1 = 1;
@@ -8188,9 +11175,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -8203,18 +11190,46 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
     var JitterEffect = /** @class */ (function () {
         function JitterEffect(jitterX, jitterY) {
@@ -8237,9 +11252,9 @@ var spine;
 })(spine || (spine = {}));
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -8252,18 +11267,46 @@ var spine;
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 var spine;
+/******************************************************************************
+ * Spine Runtimes License Agreement
+ * Last updated January 1, 2020. Replaces all prior versions.
+ *
+ * Copyright (c) 2013-2020, Esoteric Software LLC
+ *
+ * Integration of the Spine Runtimes into software or otherwise creating
+ * derivative works of the Spine Runtimes is permitted under the terms and
+ * conditions of Section 2 of the Spine Editor License Agreement:
+ * http://esotericsoftware.com/spine-editor-license
+ *
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
+ * "Products"), provided that each user of the Products must obtain their own
+ * Spine Editor license and redistribution of the Products in any form must
+ * include this license and copyright notice.
+ *
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *****************************************************************************/
 (function (spine) {
     var SwirlEffect = /** @class */ (function () {
         function SwirlEffect(radius) {
@@ -8389,7 +11432,7 @@ var spine;
             set: function (flip) {
                 this.renderer.scaleX = flip ? -1 : 1;
             },
-            enumerable: true,
+            enumerable: false,
             configurable: true
         });
         Object.defineProperty(SkeletonAnimation.prototype, "flipY", {
@@ -8399,7 +11442,7 @@ var spine;
             set: function (flip) {
                 this.renderer.scaleY = flip ? 1 : -1;
             },
-            enumerable: true,
+            enumerable: false,
             configurable: true
         });
         SkeletonAnimation.prototype.setTimeScale = function (scale) {
@@ -8474,12 +11517,12 @@ var spine;
         function SkeletonRenderer(skeletonData) {
             var _this = _super.call(this) || this;
             _this.slotRenderers = [];
-            _this.colored = false;
             _this.skeletonData = skeletonData;
             _this.stateData = new spine.AnimationStateData(skeletonData);
             _this.state = new spine.AnimationState(_this.stateData);
             _this.skeleton = new spine.Skeleton(skeletonData);
             _this.skeleton.updateWorldTransform();
+            _this.skeleton.setSlotsToSetupPose();
             _this.touchEnabled = true;
             _this.scaleY = -1;
             for (var _i = 0, _a = _this.skeleton.slots; _i < _a.length; _i++) {
@@ -8488,8 +11531,7 @@ var spine;
                 renderer.name = slot.data.name;
                 _this.slotRenderers.push(renderer);
                 _this.addChild(renderer);
-                renderer.renderSlot(slot, _this.skeleton, _this.colored);
-                _this.colored = renderer.colored;
+                renderer.renderSlot(slot, _this.skeleton);
             }
             return _this;
         }
@@ -8504,12 +11546,11 @@ var spine;
             var slots = this.skeleton.slots;
             for (var i = 0; i < drawOrder.length; i++) {
                 var slot = drawOrder[i].data.index;
-                this.setChildIndex(this.slotRenderers[slot], i);
+                this.slotRenderers[slot].zIndex = i;
             }
             for (var i = 0; i < slots.length; i++) {
                 var renderer = this.slotRenderers[i];
-                renderer.renderSlot(slots[i], this.skeleton, this.colored);
-                this.colored = renderer.colored;
+                renderer.renderSlot(slots[i], this.skeleton);
             }
         };
         return SkeletonRenderer;
@@ -8518,14 +11559,16 @@ var spine;
     var SlotRenderer = /** @class */ (function (_super) {
         __extends(SlotRenderer, _super);
         function SlotRenderer() {
-            var _this = _super !== null && _super.apply(this, arguments) || this;
-            _this.colored = false;
-            return _this;
+            return _super !== null && _super.apply(this, arguments) || this;
         }
-        SlotRenderer.prototype.renderSlot = function (slot, skeleton, colored) {
+        SlotRenderer.prototype.renderSlot = function (slot, skeleton) {
             var bone = slot.bone;
             var attachment = slot.getAttachment();
             var matrix = this.matrix;
+            if (!bone.active) {
+                this.visible = false;
+                return;
+            }
             // update transform.
             matrix.a = bone.a;
             matrix.b = bone.c;
@@ -8541,26 +11584,13 @@ var spine;
                 this.blendMode = egret.BlendMode.NORMAL;
             }
             // update color.
-            if (attachment) {
-                var r = skeleton.color.r * slot.color.r * attachment.color.r;
-                var g = skeleton.color.g * slot.color.g * attachment.color.g;
-                var b = skeleton.color.b * slot.color.b * attachment.color.b;
-                this.alpha = skeleton.color.a * slot.color.a * attachment.color.a;
-                this.colored = colored || (r & g & b) !== 1;
-                if (this.colored) {
-                    if (!this.colorFilter) {
-                        this.colorFilter = new egret.ColorMatrixFilter();
-                    }
-                    this.colorFilter.matrix[0] = r;
-                    this.colorFilter.matrix[6] = g;
-                    this.colorFilter.matrix[13] = b;
-                    if (!this.filters) {
-                        this.filters = [this.colorFilter];
-                    }
-                }
-                else {
-                    this.filters = null;
-                }
+            if (attachment && attachment.color) {
+                var color = attachment.color;
+                var r = skeleton.color.r * slot.color.r * color.r * 255;
+                var g = skeleton.color.g * slot.color.g * color.g * 255;
+                var b = skeleton.color.b * slot.color.b * color.b * 255;
+                this.tint = (r << 16) + (g << 8) + b;
+                this.alpha = skeleton.color.a * slot.color.a * color.a;
             }
             // only RegionAttachment is supported.
             if (attachment instanceof spine.RegionAttachment) {
@@ -8569,10 +11599,10 @@ var spine;
                 var regionName = region ? region.name : '';
                 this.visible = true;
                 // attachment changed.
-                if (currentName != regionName) {
+                if (currentName !== regionName) {
                     if (this.currentSprite) {
                         this.currentSprite.visible = false;
-                        this.currentSprite = null;
+                        this.currentSprite = undefined;
                     }
                     if (region) {
                         this.currentSprite = this.getChildByName(regionName) ||
@@ -8582,6 +11612,7 @@ var spine;
                 }
             }
             else {
+                // not implemented yet.
                 this.visible = false;
             }
         };
@@ -8680,14 +11711,14 @@ var spine;
         };
         Track.prototype.setAnimation = function (name, loop) {
             if (this.trackEntry)
-                this.trackEntry.listener = null;
+                this.trackEntry.listener = undefined;
             this.trackEntry = this.skelAnimation.state.setAnimation(this.trackID, name, loop);
             this.trackEntry.listener = this.stateListener;
             this.skelAnimation.renderer.update(0);
         };
         Track.prototype.playNextAnimation = function () {
             if (!this.disposed && this.animations.length > 0) {
-                var _a = this.animations[0], name_2 = _a.name, listener = _a.listener;
+                var _a = this.animations[0], name_6 = _a.name, listener = _a.listener;
                 if (listener) {
                     if (listener.playStart)
                         this.on(0 /* PlayStart */, listener.playStart, listener);
@@ -8703,7 +11734,7 @@ var spine;
                         this.on(5 /* Custom */, listener.custom, listener);
                 }
                 this.loop = 0;
-                this.setAnimation(name_2, false);
+                this.setAnimation(name_6, false);
                 this.emit(0 /* PlayStart */);
                 this.emit(2 /* LoopStart */);
             }
@@ -8732,9 +11763,9 @@ var spine;
                         this.playNextAnimation();
                     }
                     else {
+                        this.trackEntry.listener = undefined;
+                        this.trackEntry = undefined;
                         this.disposed = true;
-                        this.trackEntry.listener = null;
-                        this.trackEntry = null;
                         this.emit(6 /* TrackEnd */);
                     }
                 }
@@ -8756,4 +11787,4 @@ var spine;
     }(spine.EventEmitter));
     spine.Track = Track;
 })(spine || (spine = {}));
-//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiZWdyZXQtc3BpbmUuanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyIuLi9zcmMvY29yZS9BbmltYXRpb24udHMiLCIuLi9zcmMvY29yZS9BbmltYXRpb25TdGF0ZS50cyIsIi4uL3NyYy9jb3JlL0FuaW1hdGlvblN0YXRlRGF0YS50cyIsIi4uL3NyYy9jb3JlL0Fzc2V0TWFuYWdlci50cyIsIi4uL3NyYy9jb3JlL0F0bGFzQXR0YWNobWVudExvYWRlci50cyIsIi4uL3NyYy9jb3JlL0JsZW5kTW9kZS50cyIsIi4uL3NyYy9jb3JlL0JvbmUudHMiLCIuLi9zcmMvY29yZS9Cb25lRGF0YS50cyIsIi4uL3NyYy9jb3JlL0NvbnN0cmFpbnQudHMiLCIuLi9zcmMvY29yZS9FdmVudC50cyIsIi4uL3NyYy9jb3JlL0V2ZW50RGF0YS50cyIsIi4uL3NyYy9jb3JlL0lrQ29uc3RyYWludC50cyIsIi4uL3NyYy9jb3JlL0lrQ29uc3RyYWludERhdGEudHMiLCIuLi9zcmMvY29yZS9QYXRoQ29uc3RyYWludC50cyIsIi4uL3NyYy9jb3JlL1BhdGhDb25zdHJhaW50RGF0YS50cyIsIi4uL3NyYy9jb3JlL1NoYXJlZEFzc2V0TWFuYWdlci50cyIsIi4uL3NyYy9jb3JlL1NrZWxldG9uLnRzIiwiLi4vc3JjL2NvcmUvU2tlbGV0b25Cb3VuZHMudHMiLCIuLi9zcmMvY29yZS9Ta2VsZXRvbkNsaXBwaW5nLnRzIiwiLi4vc3JjL2NvcmUvU2tlbGV0b25EYXRhLnRzIiwiLi4vc3JjL2NvcmUvU2tlbGV0b25Kc29uLnRzIiwiLi4vc3JjL2NvcmUvU2tpbi50cyIsIi4uL3NyYy9jb3JlL1Nsb3QudHMiLCIuLi9zcmMvY29yZS9TbG90RGF0YS50cyIsIi4uL3NyYy9jb3JlL1RleHR1cmUudHMiLCIuLi9zcmMvY29yZS9UZXh0dXJlQXRsYXMudHMiLCIuLi9zcmMvY29yZS9UcmFuc2Zvcm1Db25zdHJhaW50LnRzIiwiLi4vc3JjL2NvcmUvVHJhbnNmb3JtQ29uc3RyYWludERhdGEudHMiLCIuLi9zcmMvY29yZS9Ucmlhbmd1bGF0b3IudHMiLCIuLi9zcmMvY29yZS9VcGRhdGFibGUudHMiLCIuLi9zcmMvY29yZS9VdGlscy50cyIsIi4uL3NyYy9jb3JlL1ZlcnRleEVmZmVjdC50cyIsIi4uL3NyYy9jb3JlL3BvbHlmaWxscy50cyIsIi4uL3NyYy9jb3JlL2F0dGFjaG1lbnRzL0F0dGFjaG1lbnQudHMiLCIuLi9zcmMvY29yZS9hdHRhY2htZW50cy9BdHRhY2htZW50TG9hZGVyLnRzIiwiLi4vc3JjL2NvcmUvYXR0YWNobWVudHMvQXR0YWNobWVudFR5cGUudHMiLCIuLi9zcmMvY29yZS9hdHRhY2htZW50cy9Cb3VuZGluZ0JveEF0dGFjaG1lbnQudHMiLCIuLi9zcmMvY29yZS9hdHRhY2htZW50cy9DbGlwcGluZ0F0dGFjaG1lbnQudHMiLCIuLi9zcmMvY29yZS9hdHRhY2htZW50cy9NZXNoQXR0YWNobWVudC50cyIsIi4uL3NyYy9jb3JlL2F0dGFjaG1lbnRzL1BhdGhBdHRhY2htZW50LnRzIiwiLi4vc3JjL2NvcmUvYXR0YWNobWVudHMvUG9pbnRBdHRhY2htZW50LnRzIiwiLi4vc3JjL2NvcmUvYXR0YWNobWVudHMvUmVnaW9uQXR0YWNobWVudC50cyIsIi4uL3NyYy9jb3JlL3ZlcnRleGVmZmVjdHMvSml0dGVyRWZmZWN0LnRzIiwiLi4vc3JjL2NvcmUvdmVydGV4ZWZmZWN0cy9Td2lybEVmZmVjdC50cyIsIi4uL3NyYy9pbXBsL0V2ZW50RW1pdHRlci50cyIsIi4uL3NyYy9pbXBsL1NrZWxldG9uQW5pbWF0aW9uLnRzIiwiLi4vc3JjL2ltcGwvU2tlbGV0b25SZW5kZXJlci50cyIsIi4uL3NyYy9pbXBsL1RyYWNrLnRzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiI7Ozs7Ozs7Ozs7Ozs7QUFBQTs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OytFQTJCK0U7QUFFL0UsSUFBTyxLQUFLLENBczFDWDtBQXQxQ0QsV0FBTyxLQUFLO0lBQ1g7UUFLQyxtQkFBYSxJQUFZLEVBQUUs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OzRCQUNsQixFQUFFLEdBQUcsSUFBSSxDQUFDLElBQUksQ0FBQyxNQUFNLENBQUM7NEJBQ3RCLEVBQUUsR0FBRyxJQUFJLENBQUMsSUFBSSxDQUFDLE1BQU0sQ0FBQzs0QkFDdEIsSUFBSSxDQUFDLE1BQU0sR0FBRyxFQUFFLEdBQUcsQ0FBQyxJQUFJLENBQUMsR0FBRyxDQUFDLENBQUMsQ0FBQyxHQUFHLE1BQUEsU0FBUyxDQUFDLE1BQU0sQ0FBQyxFQUFFLENBQUMsR0FBRyxFQUFFLENBQUMsR0FBRyxLQUFLLENBQUM7NEJBQ3JFLElBQUksQ0FBQyxNQUFNLEdBQUcsRUFBRSxHQUFHLENBQUMsSUFBSSxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQUMsR0FBRyxNQUFBLFNBQVMsQ0FBQyxNQUFNLENBQUMsRUFBRSxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsS0FBSyxDQUFDOzRCQUNyRSxNQUFNO3dCQUNQLEtBQUssUUFBUSxDQUFDLEtBQUssQ0FBQzt3QkFDcEIsS0FBSyxRQUFRLENBQUMsT0FBTzs0QkFDcEIsRUFBRSxHQUFHLElBQUksQ0FBQyxNQUFNLENBQUM7NEJBQ2pCLEVBQUUsR0FBRyxJQUFJLENBQUMsTUFBTSxDQUFDOzRCQUNqQixJQUFJLENBQUMsTUFBTSxHQUFHLEVBQUUsR0FBRyxDQUFDLElBQUksQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDLEdBQUcsTUFBQSxTQUFTLENBQUMsTUFBTSxDQUFDLEVBQUUsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLEtBQUssQ0FBQzs0QkFDckUsSUFBSSxDQUFDLE1BQU0sR0FBRyxFQUFFLEdBQUcsQ0FBQyxJQUFJLENBQUMsR0FBRyxDQUFDLENBQUMsQ0FBQyxHQUFHLE1BQUEsU0FBUyxDQUFDLE1BQU0sQ0FBQyxFQUFFLENBQUMsR0FBRyxFQUFFLENBQUMsR0FBRyxLQUFLLENBQUM7NEJBQ3JFLE1BQU07d0JBQ1AsS0FBSyxRQUFRLENBQUMsR0FBRzs0QkFDaEIsRUFBRSxHQUFHLElBQUksQ0FBQyxNQUFNLENBQUM7NEJBQ2pCLEVBQUUsR0FBRyxJQUFJLENBQUMsTUFBTSxDQUFDOzRCQUNqQixJQUFJLENBQUMsTUFBTSxHQUFHLEVBQUUsR0FBRyxDQUFDLElBQUksQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDLEdBQUcsTUFBQSxTQUFTLENBQUMsTUFBTSxDQUFDLEVBQUUsQ0FBQyxHQUFHLElBQUksQ0FBQyxJQUFJLENBQUMsTUFBTSxDQUFDLEdBQUcsS0FBSyxDQUFDOzRCQUNuRixJQUFJLENBQUMsTUFBTSxHQUFHLEVBQUUsR0FBRyxDQUFDLElBQUksQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDLEdBQUcsTUFBQSxTQUFTLENBQUMsTUFBTSxDQUFDLEVBQUUsQ0FBQyxHQUFHLElBQUksQ0FBQyxJQUFJLENBQUMsTUFBTSxDQUFDLEdBQUcsS0FBSyxDQUFDO3FCQUNuRjtpQkFDRDtxQkFBTTtvQkFDTixRQUFRLEtBQUssRUFBRTt3QkFDZixLQUFLLFFBQVEsQ0FBQyxLQUFLOzRCQUNsQixFQUFFLEdBQUcsSUFBSSxDQUFDLEdBQUcsQ0FBQyxJQUFJLENBQUMsSUFBSSxDQUFDLE1BQU0sQ0FBQyxHQUFHLE1BQUEsU0FBUyxDQUFDLE1BQU0sQ0FBQyxDQUFDLENBQUMsQ0FBQzs0QkFDdEQsRUFBRSxHQUFHLElBQUksQ0FBQyxHQUFHLENBQUMsSUFBSSxDQUFDLElBQUksQ0FBQyxNQUFNLENBQUMsR0FBRyxNQUFBLFNBQVMsQ0FBQyxNQUFNLENBQUMsQ0FBQyxDQUFDLENBQUM7NEJBQ3RELElBQUksQ0FBQyxNQUFNLEdBQUcsRUFBRSxHQUFHLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLEtBQUssQ0FBQzs0QkFDcEMsSUFBSSxDQUFDLE1BQU0sR0FBRyxFQUFFLEdBQUcsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsS0FBSyxDQUFDOzRCQUNwQyxNQUFNO3dCQUNQLEtBQUssUUFBUSxDQUFDLEtBQUssQ0FBQzt3QkFDcEIsS0FBSyxRQUFRLENBQUMsT0FBTzs0QkFDcEIsRUFBRSxHQUFHLElBQUksQ0FBQyxHQUFHLENBQUMsSUFBSSxD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LEdBQUcsR0FBRyxHQUFHLEVBQUUsR0FBRyxFQUFFLEdBQUcsR0FBRyxDQUFDLENBQUM7WUFDMUMsSUFBSSxDQUFDLEVBQUUsR0FBRyxDQUFDLEVBQUUsR0FBRyxFQUFFLEdBQUcsR0FBRyxHQUFHLEVBQUUsR0FBRyxFQUFFLEdBQUcsR0FBRyxDQUFDLENBQUM7WUFDMUMsSUFBSSxFQUFFLEdBQUcsR0FBRyxHQUFHLEVBQUUsQ0FBQztZQUNsQixJQUFJLEVBQUUsR0FBRyxHQUFHLEdBQUcsRUFBRSxDQUFDO1lBQ2xCLElBQUksRUFBRSxHQUFHLEdBQUcsR0FBRyxFQUFFLENBQUM7WUFDbEIsSUFBSSxFQUFFLEdBQUcsR0FBRyxHQUFHLEVBQUUsQ0FBQztZQUNsQixJQUFJLEVBQUUsR0FBRyxFQUFFLEdBQUcsSUFBSSxDQUFDLENBQUMsR0FBRyxFQUFFLEdBQUcsSUFBSSxDQUFDLENBQUMsQ0FBQztZQUNuQyxJQUFJLEVBQUUsR0FBRyxFQUFFLEdBQUcsSUFBSSxDQUFDLENBQUMsR0FBRyxFQUFFLEdBQUcsSUFBSSxDQUFDLENBQUMsQ0FBQztZQUNuQyxJQUFJLEVBQUUsR0FBRyxFQUFFLEdBQUcsSUFBSSxDQUFDLENBQUMsR0FBRyxFQUFFLEdBQUcsSUFBSSxDQUFDLENBQUMsQ0FBQztZQUNuQyxJQUFJLEVBQUUsR0FBRyxFQUFFLEdBQUcsSUFBSSxDQUFDLENBQUMsR0FBRyxFQUFFLEdBQUcsSUFBSSxDQUFDLENBQUMsQ0FBQztZQUNuQyxJQUFJLENBQUMsT0FBTyxHQUFHLENBQUMsQ0FBQztZQUNqQixJQUFJLENBQUMsT0FBTyxHQUFHLElBQUksQ0FBQyxJQUFJLENBQUMsRUFBRSxHQUFHLEVBQUUsR0FBRyxFQUFFLEdBQUcsRUFBRSxDQUFDLENBQUM7WUFDNUMsSUFBSSxJQUFJLENBQUMsT0FBTyxHQUFHLE1BQU0sRUFBRTtnQkFDMUIsSUFBSSxHQUFHLEdBQUcsRUFBRSxHQUFHLEVBQUUsR0FBRyxFQUFFLEdBQUcsRUFBRSxDQUFDO2dCQUM1QixJQUFJLENBQUMsT0FBTyxHQUFHLEdBQUcsR0FB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R0FBRyxHQUFHLENBQUM7Z0JBQ2xCLENBQUMsR0FBRyxFQUFFLEdBQUcsSUFBSSxDQUFDLEdBQUcsQ0FBQyxFQUFFLENBQUMsQ0FBQztnQkFDdEIsRUFBRSxHQUFHLElBQUksQ0FBQyxLQUFLLENBQUMsRUFBRSxHQUFHLENBQUMsR0FBRyxFQUFFLEdBQUcsQ0FBQyxFQUFFLEVBQUUsR0FBRyxDQUFDLEdBQUcsRUFBRSxHQUFHLENBQUMsQ0FBQyxDQUFDO2FBQ2xEO2lCQUFNO2dCQUNOLENBQUMsR0FBRyxHQUFHLEdBQUcsRUFBRSxDQUFDO2dCQUNiLENBQUMsR0FBRyxHQUFHLEdBQUcsRUFBRSxDQUFDO2dCQUNiLElBQUksRUFBRSxHQUFHLENBQUMsR0FBRyxDQUFDLEVBQUUsRUFBRSxHQUFHLENBQUMsR0FBRyxDQUFDLEVBQUUsRUFBRSxHQUFHLElBQUksQ0FBQyxLQUFLLENBQUMsRUFBRSxFQUFFLEVBQUUsQ0FBQyxDQUFDO2dCQUNwRCxDQUFDLEdBQUcsRUFBRSxHQUFHLEVBQUUsR0FBRyxFQUFFLEdBQUcsRUFBRSxHQUFHLEVBQUUsR0FBRyxFQUFFLEdBQUcsRUFBRSxDQUFDO2dCQUNyQyxJQUFJLEVBQUUsR0FBRyxDQUFDLENBQUMsR0FBRyxFQUFFLEdBQUcsRUFBRSxFQUFFLEVBQUUsR0FBRyxFQUFFLEdBQUcsRUFBRSxDQUFDO2dCQUNwQyxDQUFDLEdBQUcsRUFBRSxHQUFHLEVBQUUsR0FBRyxDQUFDLEdBQUcsRUFBRSxHQUFHLENBQUMsQ0FBQztnQkFDekIsSUFBSSxDQUFDLElBQUksQ0FBQyxFQUFFO29CQUNYLElBQUksQ0FBQyxHQUFHLElBQUksQ0FBQyxJQUFJLENBQUMsQ0FBQyxDQUFDLENBQUM7b0JBQ3JCLElBQUksRUFBRSxHQUFHLENBQUM7d0JBQUUsQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDO29CQUNuQixDQUFDLEdBQUcsQ0FBQyxDQUFDLEVBQUUsR0FBRyxDQUFDLENBQUMsR0FBRyxDQUFDLENBQUM7b0JBQ2xCLElBQUksRUFBRSxHQUFHLENBQUMsR0FBRyxFQUFFLEVBQUUsRUFBRSxHQUFHLENBQUMsR0FBRyxDQUFDLENBQUM7b0JBQzVCLElBQUksQ0FBQyxHQUFHLElBQUksQ0FBQyxHQUFHLENBQUMsRUFBRSxDQUFDLEdBQUcsSUFBSSxDQUFDLEdBQUcsQ0FBQyxFQUFFLENBQUMsQ0FBQyxDQUFDLENBQUMsRUFBRSxDQUFDLENBQUMsQ0FBQyxFQUFFLENBQUM7b0JBQzlDLElBQUksQ0FBQyxHQUFHLENBQUMsSUFBSSxFQUFFLEVBQUU7d0JBQ2hCLENBQUMsR0FBRyxJQUFJLENBQUMsSUFBSSxDQUFDLEVBQUUsR0FBRyxDQUFDLEdBQUcsQ0FBQyxDQUFDLEdBQUcsT0FBTyxDQUFDO3dCQUNwQyxFQUFFLEdBQUcsRUFBRSxHQUFHLElBQUksQ0FBQyxLQUFLLENBQUMsQ0FBQyxFQUFFLENBQUMsQ0FBQyxDQUFDO3dCQUMzQixFQUFFLEdBQUcsSUFBSSxDQUFDLEtBQUssQ0FBQyxDQUFDLEdBQUcsR0FBRyxFQUFFLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLEdBQUcsQ0FBQyxDQUFDO3dCQUN6QyxNQUFNLEtBQUssQ0FBQztxQkFDWjtpQkFDRDtnQkFDRCxJQUFJLFFBQVEsR0FBRyxNQUFBLFNBQVMsQ0FBQyxFQUFFLEVBQUUsSUFBSSxHQUFHLEVBQUUsR0FBRyxDQUFDLEVBQUUsT0FBTyxHQUFHLElBQUksR0FBRyxJQUFJLEVBQUUsSUFBSSxHQUFHLENBQUMsQ0FBQztnQkFDNUUsSUFBSSxRQUFRLEdBQUcsQ0FBQyxFQUFFLElBQUksR0FBRyxFQUFFLEdBQUcsQ0FBQyxFQUFFLE9BQU8sR0FBRyxJQUFJLEdBQUcsSUFBSSxFQUFFLElBQUksR0FBRyxDQUFDLENBQUM7Z0JBQ2pFLENBQUMsR0FBRyxDQUFDLENBQUMsR0FBRyxFQUFFLEdBQUcsQ0FBQyxFQUFFLEdBQUcsRUFBRSxDQUFDLENBQUM7Z0JBQ3hCLElBQUksQ0FBQyxJQUFJLENBQUMsQ0FBQyxJQUFJLENBQUMsSUFBSSxDQUFDLEVBQUU7b0JBQ3RCLENBQUMsR0FBRyxJQUFJLENBQUMsSUFBSSxDQUFDLENBQUMsQ0FBQyxDQUFDO29CQUNqQixDQUFDLEdBQUcsQ0FBQyxHQUFHLElBQUksQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDO29CQUN6QixDQUFDLEdBQUcsQ0FBQyxHQUFHLElBQUksQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDLENBQUM7b0JBQ3BCLENBQUMsR0FBRyxDQUFDLEdBQUcsQ0FBQyxHQUFHLENBQUMsR0FBRyxDQUFDLENBQUM7b0JBQ2xCLElBQUksQ0FBQyxHQUFHLE9BQU8sRUFBRTt3QkFDaEIsUUFBUSxHQUFHLENBQUMsQ0FBQzt3QkFDYixPQUFPLEdBQUcsQ0FBQyxDQUFDO3dCQUNaLElBQUksR0FBRyxDQUFDLENBQUM7d0JBQ1QsSUFBSSxHQUFHLENBQUMsQ0FBQztxQkFDVDtvQkFDRCxJQUFJLENBQUMsR0FBRyxPQUFPLEVBQUU7d0JBQ2hCLFFBQVEsR0FBRyxDQUFDLENBQUM7d0JBQ2IsT0FBTyxHQUFHLENBQUMsQ0FBQzt3QkFDWixJQUFJLEdBQUcsQ0FBQyxDQUFDO3dCQUNULElBQUksR0FBRyxDQUFDLENBQUM7cUJBQ1Q7aUJBQ0Q7Z0JBQ0QsSUFBSSxFQUFFLElBQUksQ0FBQyxPQUFPLEdBQUcsT0FBTyxDQUFDLEdBQUcsQ0FBQyxFQUFFO29CQUNsQyxFQUFFLEdBQUcsRUFBRSxHQUFHLElBQUksQ0FBQyxLQUFLLENBQUMsSUFBSSxHQUFHLE9BQU8sRUFBRSxJQUFJLENBQUMsQ0FBQztvQkFDM0MsRUFBRSxHQUFHLFFBQVEsR0FBRyxPQUFPLENBQUM7aUJBQ3hCO3FCQUFNO29CQUNOLEVBQUUsR0FBRyxFQUFFLEdBQUcsSUFBSSxDQUFDLEtBQUssQ0FBQyxJQUFJLEdBQUcsT0FBTyxFQUFFLElBQUksQ0FBQyxDQUFDO29CQUMzQyxFQUFFLEdBQUcsUUFBUSxHQUFHLE9BQU8sQ0FBQztpQkFDeEI7YUFDRDtZQUNELElBQUksRUFBRSxHQUFHLElBQUksQ0FBQyxLQUFLLENBQUMsRUFBRSxFQUFFLEVBQUUsQ0FBQyxHQUFHLEVBQUUsQ0FBQztZQUNqQyxJQUFJLFFBQVEsR0FBRyxNQUFNLENBQUMsU0FBUyxDQUFDO1lBQ2hDLEVBQUUsR0FBRyxDQUFDLEVBQUUsR0FBRyxFQUFFLENBQUMsR0FBRyxNQUFBLFNBQVMsQ0FBQyxNQUFNLEdBQUcsR0FBRyxHQUFHLFFBQVEsQ0FBQztZQUNuRCxJQUFJLEVBQUUsR0FBRyxHQUFHO2dCQUNYLEVBQUUsSUFBSSxHQUFHLENBQUM7aUJBQ04sSUFBSSxFQUFFLEdBQUcsQ0FBQyxHQUFHO2dCQUFFLEVBQUUsSUFBSSxHQUFHLENBQUM7WUFDOUIsTUFBTSxDQUFDLHdCQUF3QixDQUFDLEVBQUUsRUFBRSxFQUFFLEVBQUUsUUFBUSxHQUFHLEVBQUUsR0FBRyxLQUFLLEVBQUUsRUFBRSxFQUFFLE1BQU0sQ0FBQyxPQUFPLEVBQUUsQ0FBQyxFQUFFLENBQUMsQ0FBQyxDQUFDO1lBQ3pGLFFBQVEsR0FBRyxLQUFLLENBQUMsU0FBUyxDQUFDO1lBQzNCLEVBQUUsR0FBRyxDQUFDLENBQUMsRUFBRSxHQUFHLEVBQUUsQ0FBQyxHQUFHLE1BQUEsU0FBUyxDQUFDLE1BQU0sR0FBRyxLQUFLLENBQUMsT0FBTyxDQUFDLEdBQUcsRUFBRSxHQUFHLEdBQUcsR0FBRyxRQUFRLENBQUM7WUFDMUUsSUFBSSxFQUFFLEdBQUcsR0FBRztnQkFDWCxFQUFFLElBQUksR0FBRyxDQUFDO2lCQUNOLElBQUksRUFBRSxHQUFHLENBQUMsR0FBRztnQkFBRSxFQUFFLElBQUksR0FBRyxDQUFDO1lBQzlCLEtBQUssQ0FBQyx3QkFBd0IsQ0FBQyxFQUFFLEVBQUUsRUFBRSxFQUFFLFFBQVEsR0FBRyxFQUFFLEdBQUcsS0FBSyxFQUFFLEtBQUssQ0FBQyxPQUFPLEVBQUUsS0FBSyxDQUFDLE9BQU8sRUFBRSxLQUFLLENBQUMsT0FBTyxFQUFFLEtBQUssQ0FBQyxPQUFPLENBQUMsQ0FBQztRQUMzSCxDQUFDO1FBQ0YsbUJBQUM7SUFBRCxDQUFDLEFBdk1ELElBdU1DO0lBdk1ZLGtCQUFZLGVBdU14QixDQUFBO0FBQ0YsQ0FBQyxFQXpNTSxLQUFLLEtBQUwsS0FBSyxRQXlNWDtBQ3RPRDs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OytFQTJCK0U7QUFFL0UsSUFBTyxLQUFLLENBZ0JYO0FBaEJELFdBQU8sS0FBSztJQUNYO1FBV0MsMEJBQWEsSUFBWTtZQVR6QixVQUFLLEdBQUcsQ0FBQyxDQUFDO1lBQ1YsVUFBSyxHQUFHLElBQUksS0FBSyxFQUFZLENBQUM7WUFFOUIsa0JBQWEsR0FBRyxDQUFDLENBQUM7WUFDbEIsYUFBUSxHQUFHLEtBQUssQ0FBQztZQUNqQixZQUFPLEdBQUcsS0FBSyxDQUFDO1lBQ2hCLFlBQU8sR0FBRyxLQUFLLENBQUM7WUFDaEIsUUFBRyxHQUFHLENBQUMsQ0FBQztZQUdQLElBQUksQ0FBQyxJQUFJLEdBQUcsSUFBSSxDQUFDO1FBQ2xCLENBQUM7UUFDRix1QkFBQztJQUFELENBQUMsQUFkRCxJQWNDO0lBZFksc0JBQWdCLG1CQWM1QixDQUFBO0FBQ0YsQ0FBQyxFQWhCTSxLQUFLLEtBQUwsS0FBSyxRQWdCWDtBQzdDRDs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OytFQTJCK0U7QUFFL0UsSUFBTyxLQUFLLENBMllYO0FBM1lELFdBQU8sS0FBSztJQUNYO1FBYUMsd0JBQWEsSUFBd0IsRUFBRSxRQUFrQjtZQU56RCxhQUFRLEdBQUcsQ0FBQyxDQUFDO1lBQUMsWUFBTyxHQUFHLENBQUMsQ0FBQztZQUFDLGNBQVMsR0FBRyxDQUFDLENBQUM7WUFBQyxpQkFBWSxHQUFHLENBQUMsQ0FBQztZQUUzRCxXQUFNLEdBQUcsSUFBSSxLQUFLLEVBQVUsQ0FBQztZQUFDLGNBQVMsR0FBRyxJQUFJLEtBQUssRUFBVSxDQUFDO1lBQzlELFVBQUssR0FBRyxJQUFJLEtBQUssRUFBVSxDQUFDO1lBQUMsV0FBTSxHQUFHLElBQUksS0FBSyxFQUFVLENBQUM7WUFBQyxZQUFPLEdBQUcsSUFBSSxLQUFLLEVBQVUsQ0FBQztZQUN6RixhQUFRLEdBQUcsSUFBSSxLQUFLLEVBQVUsQ0FBQztZQUc5QixJQUFJLElBQUksSUFBSSxJQUFJO2dCQUFFLE1BQU0sSUFBSSxLQUFLLENBQUMsc0JBQXNCLENBQUMsQ0FBQztZQUMxRCxJQUFJLFFBQVEsSUFBSSxJQUFJO2dCQUFFLE1BQU0sSUFBSSxLQUFLLENBQUMsMEJBQTBCLENBQUMsQ0FBQztZQUNsRSxJQUFJLENBQUMsSUFBSSxHQUFHLElBQUksQ0FBQztZQUNqQixJQUFJLENBQUMsS0FBSyxHQUFHLElBQUksS0FBSyxFQUFRLENBQUM7WUFDL0IsS0FBSyxJQUFJLENBQUMsR0FBRyxDQUFDLEVBQUUsQ0FBQyxHQUFHLElBQUksQ0FBQyxLQUFLLENBQUMsTUFBTSxFQUFFLENBQUMsR0FBRyxDQUFDLEVBQUUsQ0FBQyxFQUFFO2dCQUNoRCxJQUFJLENBQUMsS0FBSyxDQUFDLElBQUksQ0FBQyxRQUFRLENBQUMsUUFBUSxDQUFDLElBQUksQ0FBQyxLQUFLLENBQUMsQ0FBQyxDQUFDLENBQUMsSUFBSSxDQUFDLENBQUMsQ0FBQztZQUN4RCxJQUFJLENBQUMsTUFBTSxHQUFHLFFBQVEsQ0FBQyxRQUFRLENBQUMsSUFBSSxDQUFDLE1BQU0sQ0FBQyxJQUFJLENBQUMsQ0FBQztZQUNsRCxJQUFJLENBQUMsUUFBUSxHQUFHLElBQUksQ0FBQyxRQUFRLENBQUM7WUFDOUIsSUFBSSxDQUFDLE9BQU8sR0FBRyxJQUFJLENBQUMsT0FBTyxDQUFDO1lBQzVCLElBQUksQ0FBQyxTQUFTLEdBQUcsSUFBSSxDQUFDLFNBQVMsQ0FBQztZQUNoQyxJQUFJLENBQUMsWUFBWSxHQUFHLElBQUksQ0FBQyxZQUFZLENBQUM7UUFDdkMsQ0FBQztRQUVELDhCQUFLLEdBQUw7WUFDQyxJQUFJLENBQUMsTUFBTSxFQUFFLENBQUM7UUFDZixDQUFDO1FBRUQsK0JBQU0sR0FBTjtZQUNDLElBQUksVUFBVSxHQUFHLElBQUksQ0FBQyxNQUFNLENBQUMsYUFBYSxFQUFFLENBQUM7WUFDN0MsSUFBSSxDQUFDLENBQUMsVUFBVSxZQUFZLE1BQUEsY0FBYyxDQUFDO2dCQUFFLE9BQU87WUFFcEQsSUFBSSxTQUFTLEdBQUcsSUFBSSxDQUFDLFNBQVMsRUFBRSxZQUFZLEdBQUcsSUFBSSxDQUFDLFlBQVksQ0FBQztZQUNqRSxJQUFJLFNBQVMsR0FBRyxZQUFZLEdBQUcsQ0FBQyxFQUFFLE1BQU0sR0FBRyxTQUFTLEdBQUcsQ0FBQyxDQUFDO1lBQ3pELElBQUksQ0FBQyxTQUFTLElBQUksQ0FBQyxNQUFNO2dCQUFFLE9BQU87WUFFbEMsSUFBSSxJQUFJLEdBQUcsSUFBSSxDQUFDLElBQUksQ0FBQztZQUNyQixJQUFJLGNBQWMsR0FBRyxJQUFJLENBQUMsV0FBVyxJQUFJLE1BQUEsV0FBVyxDQUFDLE9BQU8sQ0FBQztZQUM3RCxJQUFJLFVBQVUsR0FBRyxJQUFJLENBQUMsVUFBVSxDQUFDO1lBQ2pDLElBQUksUUFBUSxHQUFHLFVBQVUsSUFBSSxNQUFBLFVBQVUsQ0FBQyxPQUFPLEVBQUUsS0FBSyxHQUFHLFVBQVUsSUFBSSxNQUFBLFVBQVUsQ0FBQyxVQUFVLENBQUM7WUFDN0YsSUFBSSxTQUFTLEdBQUcsSUFBSSxDQUFDLEtBQUssQ0FBQyxNQUFNLEVBQUUsV0FBVyxHQUFHLFFBQVEsQ0FBQyxDQUFDLENBQUMsU0FBUyxDQUFDLENBQUMsQ0FBQyxTQUFTLEdBQUcsQ0FBQyxDQUFDO1lBQ3RGLElBQUksS0FBSyxHQUFHLElBQUksQ0FBQyxLQUFLLENBQUM7WUFDdkIsSUFBSSxNQUFNLEdBQUcsTUFBQSxLQUFLLENBQUMsWUFBWSxDQUFDLElBQUksQ0FBQyxNQUFNLEVBQUUsV0FBVyxDQUFDLEVBQUUsT0FBTyxHQUFrQixJQUFJLENBQUM7WUFDekYsSUFBSSxPQUFPLEdBQUcsSUFBSSxDQUFDLE9BQU8sQ0FBQztZQUMzQixJQUFJLEtBQUssSUFBSSxDQUFDLGNBQWMsRUFBRTtnQkFDN0IsSUFBSSxLQUFLO29CQUFFLE9BQU8sR0FBRyxNQUFBLEtBQUssQ0FBQyxZQUFZLENBQUMsSUFBSSxDQUFDLE9BQU8sRUFBRSxTQUFTLENBQUMsQ0FBQztnQkFDakUsSUFBSSxhQUFhLEdBQUcsSUFBSSxDQUFDLFdBQVcsSUFBSSxNQUFBLFdBQVcsQ0FBQyxNQUFNLENBQUM7Z0JBQzNELEtBQUssSUFBSSxDQUFDLEdBQUcsQ0FBQyxFQUFFLENBQUMsR0FBRyxXQUFXLEdBQUcsQ0FBQyxFQUFFLENBQUMsR0FBRyxDQUFDLEdBQUc7b0JBQzVDLElBQUksSUFBSSxHQUFHLEtBQUssQ0FBQyxDQUFDLENBQUMsQ0FBQztvQkFDcEIsSUFBSSxXQUFXLEdBQUcsSUFBSSxDQUFDLElBQUksQ0FBQyxNQUFNLENBQUM7b0JBQ25DLElBQUksV0FBVyxHQUFHLGNBQWMsQ0FBQyxPQUFPLEVBQUU7d0JBQ3pDLElBQUksS0FBSzs0QkFBRSxPQUFPLENBQUMsQ0FBQyxDQUFDLEdBQUcsQ0FBQyxDQUFDO3dCQUMxQixNQUFNLENBQUMsRUFBRSxDQUFDLENBQUMsR0FBRyxDQUFDLENBQUM7cUJBQ2hCO3lCQUFNLElBQUksY0FBYyxFQUFFO3dCQUMxQixJQUFJLEtBQUssRUFBRTs0QkFDVixJQUFJLENBQUMsR0FBRyxXQUFXLEdBQUcsSUFBSSxDQUFDLENBQUMsRUFBRSxDQUFDLEdBQUcsV0FBVyxHQUFHLElBQUksQ0FBQyxDQUFDLENBQUM7NEJBQ3ZELElBQUksUUFBTSxHQUFHLElBQUksQ0FBQyxJQUFJLENBQUMsQ0FBQyxHQUFHLENBQUMsR0FBRyxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQUM7NEJBQ3RDLE9BQU8sQ0FBQyxDQUFDLENBQUMsR0FBRyxRQUFNLENBQUM7eUJBQ3BCO3dCQUNELE1BQU0sQ0FBQyxFQUFFLENBQUMsQ0FBQyxHQUFHLE9BQU8sQ0FBQztxQkFDdEI7eUJBQU07d0JBQ04sSUFBSSxDQUFDLEdBQUcsV0FBVyxHQUFHLElBQUksQ0FBQyxDQUFDLEVBQUUsQ0FBQyxHQUFHLFdBQVcsR0FBRyxJQUFJLENBQUMsQ0FBQyxDQUFDO3dCQUN2RCxJQUFJLFFBQU0sR0FBRyxJQUFJLENBQUMsSUFBSSxDQUFDLENBQUMsR0FBRyxDQUFDLEdBQUcsQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDO3dCQUN0QyxJQUFJLEtBQUs7NEJBQUUsT0FBTyxDQUFDLENBQUMsQ0FBQyxHQUFHLFFBQU0sQ0FBQzt3QkFDL0IsTUFBTSxDQUFDLEVBQUUsQ0FBQyxDQUFDLEdBQUcsQ0FBQyxhQUFhLENBQUMsQ0FBQyxDQUFDLFdBQVcsR0FBRyxPQUFPLENBQUMsQ0FBQyxDQUFDLE9BQU8sQ0FBQyxHQUFHLFFBQU0sR0FBRyxXQUFXLENBQUM7cUJBQ3ZGO2lCQUNEO2FBQ0Q7aUJBQU07Z0JBQ04sS0FBSyxJQUFJLENBQUMsR0FBRyxDQUFDLEVBQUUsQ0FBQyxHQUFHLFdBQVcsRUFBRSxDQUFDLEVBQUU7b0JBQ25DLE1BQU0sQ0FBQyxDQUFDLENBQUMsR0FBRyxPQUFPLENBQUM7YUFDckI7WUFFRCxJQUFJLFNBQVMsR0FBRyxJQUFJLENBQUMscUJBQXFCLENBQWlCLFVBQVUsRUFBRSxXQUFXLEVBQUUsUUFBUSxFQUMzRixJQUFJLENBQUMsWUFBWSxJQUFJLE1BQUEsWUFBWSxDQUFDLE9BQU8sRUFBRSxjQUFjLENBQUMsQ0FBQztZQUM1RCxJQUFJLEtBQUssR0FBRyxTQUFTLENBQUMsQ0FBQyxDQUFDLEVBQUUsS0FBSyxHQUFHLFNBQVMsQ0FBQyxDQUFDLENBQUMsRUFBRSxjQUFjLEdBQUcsSUFBSSxDQUFDLGNBQWMsQ0FBQztZQUNyRixJQUFJLEdBQUcsR0FBRyxLQUFLLENBQUM7WUFDaEIsSUFBSSxjQUFjLElBQUksQ0FBQztnQkFDdEIsR0FBRyxHQUFHLFVBQVUsSUFBSSxNQUFBLFVBQVUsQ0FBQyxLQUFLLENBQUM7aUJBQ2pDO2dCQUNKLEdBQUcsR0FBRyxLQUFLLENBQUM7Z0JBQ1osSUFBSSxDQUFDLEdBQUcsSUFBSSxDQUFDLE1BQU0sQ0FBQyxJQUFJLENBQUM7Z0JBQ3pCLGNBQWMsSUFBSSxDQUFDLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDLENBQUMsTUFBQSxTQUFTLENBQUMsTUFBTSxDQUFDLENBQUMsQ0FBQyxDQUFDLE1BQUEsU0FBUyxDQUFDLE1BQU0sQ0FBQzthQUNuRjtZQUNELEtBQUssSUFBSSxDQUFDLEdBQUcsQ0FBQyxFQUFFLENBQUMsR0FBRyxDQUFDLEVBQUUsQ0FBQyxHQUFHLFNBQVMsRUFBRSxDQUFDLEVBQUUsRUFBRSxDQUFDLElBQUksQ0FBQyxFQUFFO2dCQUNsRCxJQUFJLElBQUksR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDLENBQUM7Z0JBQ3BCLElBQUksQ0FBQyxNQUFNLElBQUksQ0FBQyxLQUFLLEdBQUcsSUFBSSxDQUFDLE1BQU0sQ0FBQyxHQUFHLFlBQVksQ0FBQztnQkFDcEQsSUFBSSxDQUFDLE1BQU0sSUFBSSxDQUFDLEtBQUssR0FBRyxJQUFJLENBQUMsTUFBTSxDQUFDLEdBQUcsWUFBWSxDQUFDO2dCQUNwRCxJQUFJLENBQUMsR0FBRyxTQUFTLENBQUMsQ0FBQyxDQUFDLEVBQUUsQ0FBQyxHQUFHLFNBQVMsQ0FBQyxDQUFDLEdBQUcsQ0FBQyxDQUFDLEVBQUUsRUFBRSxHQUFHLENBQUMsR0FBRyxLQUFLLEVBQUUsRUFBRSxHQUFHLENBQUMsR0FBRyxLQUFLLENBQUM7Z0JBQzNFLElBQUksS0FBSyxFQUFFO29CQUNWLElBQUksUUFBTSxHQUFHLE9BQU8sQ0FBQyxDQUFDLENBQUMsQ0FBQztvQkFDeEIsSUFBSSxRQUFNLElBQUksQ0FBQyxFQUFFO3dCQUNoQixJQUFJLENBQUMsR0FBRyxDQUFDLElBQUksQ0FBQyxJQUFJLENBQUMsRUFBRSxHQUFHLEVBQUUsR0FBRyxFQUFFLEdBQUcsRUFBRSxDQUFDLEdBQUcsUUFBTSxHQUFHLENBQUMsQ0FBQyxHQUFHLFNBQVMsR0FBRyxDQUFDLENBQUM7d0JBQ3BFLElBQUksQ0FBQyxDQUFDLElBQUksQ0FBQyxDQUFDO3dCQUNaLElBQUksQ0FBQyxDQUFDLElBQUksQ0FBQyxDQUFDO3FCQUNaO2lCQUNEO2dCQUNELEtBQUssR0FBRyxDQUFDLENBQUM7Z0JBQ1YsS0FBSyxHQUFHLENBQUMsQ0FBQztnQkFDVixJQUFJLE1BQU0sRUFBRTtvQkFDWCxJQUFJLENBQUMsR0FBRyxJQUFJLENBQUMsQ0FBQyxFQUFFLENBQUMsR0FBRyxJQUFJLENBQUMsQ0FBQyxFQUFFLENBQUMsR0FBRyxJQUFJLENBQUMsQ0FBQyxFQUFFLENBQUMsR0FBRyxJQUFJLENBQUMsQ0FBQyxFQUFFLENBQUMsR0FBRyxDQUFDLEVBQUUsR0FBRyxHQUFHLENBQUMsRUFBRSxHQUFHLEdBQUcsQ0FBQyxDQUFDO29CQUM1RSxJQUFJLFFBQVE7d0JBQ1gsQ0FBQyxHQUFHLFNBQVMsQ0FBQyxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQUM7eUJBQ2pCLElBQUksTUFBTSxDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsSUFBSSxDQUFDO3dCQUMxQixDQUFDLEdBQUcsU0FBUyxDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsQ0FBQzs7d0JBRXJCLENBQUMsR0FBRyxJQUFJLENBQUMsS0FBSyxDQUFDLEVBQUUsRUFBRSxFQUFFLENBQUMsQ0FBQztvQkFDeEIsQ0FBQyxJQUFJLElBQUksQ0FBQyxLQUFLLENBQUMsQ0FBQyxFQUFFLENBQUMsQ0FBQyxDQUFDO29CQUN0QixJQUFJLEdBQUcsRUFBRTt3QkFDUixHQUFHLEdBQUcsSUFBSSxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQUMsQ0FBQzt3QkFDbEIsR0FBRyxHQUFHLElBQUksQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDLENBQUM7d0JBQ2xCLElBQUksUUFBTSxHQUFHLElBQUksQ0FBQyxJQUFJLENBQUMsTUFBTSxDQUFDO3dCQUM5QixLQUFLLElBQUksQ0FBQyxRQUFNLEdBQUcsQ0FBQyxHQUFHLEdBQUcsQ0FBQyxHQUFHLEdBQUcsR0FBRyxDQUFDLENBQUMsR0FBRyxFQUFFLENBQUMsR0FBRyxTQUFTLENBQUM7d0JBQ3pELEtBQUssSUFBSSxDQUFDLFFBQU0sR0FBRyxDQUFDLEdBQUcsR0FBRyxDQUFDLEdBQUcsR0FBRyxHQUFHLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLFNBQVMsQ0FBQztxQkFDekQ7eUJBQU07d0JBQ04sQ0FBQyxJQUFJLGNBQWMsQ0FBQztxQkFDcEI7b0JBQ0QsSUFBSSxDQUFDLEdBQUcsTUFBQSxTQUFTLENBQUMsRUFBRTt3QkFDbkIsQ0FBQyxJQUFJLE1BQUEsU0FBUyxDQUFDLEdBQUcsQ0FBQzt5QkFDZixJQUFJLENBQUMsR0FBRyxDQUFDLE1BQUEsU0FBUyxDQUFDLEVBQUUsRUFBRSxFQUFFO3dCQUM3QixDQUFDLElBQUksTUFBQSxTQUFTLENBQUMsR0FBRyxDQUFDO29CQUNwQixDQUFDLElBQUksU0FBUyxDQUFDO29CQUNmLEdBQUcsR0FBRyxJQUFJLENBQUMsR0FBRyxDQUFDLENBQUMsQ0FBQyxDQUFDO29CQUNsQixHQUFHLEdBQUcsSUFBSSxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQUMsQ0FBQztvQkFDbEIsSUFBSSxDQUFDLENBQUMsR0FBRyxHQUFHLEdBQUcsQ0FBQyxHQUFHLEdBQUcsR0FBRyxDQUFDLENBQUM7b0JBQzNCLElBQUksQ0FBQyxDQUFDLEdBQUcsR0FBRyxHQUFHLENBQUMsR0FBRyxHQUFHLEdBQUcsQ0FBQyxDQUFDO29CQUMzQixJQUFJLENBQUMsQ0FBQyxHQUFHLEdBQUcsR0FBRyxDQUFDLEdBQUcsR0FBRyxHQUFHLENBQUMsQ0FBQztvQkFDM0IsSUFBSSxDQUFDLENBQUMsR0FBRyxHQUFHLEdBQUcsQ0FBQyxHQUFHLEdBQUcsR0FBRyxDQUFDLENBQUM7aUJBQzNCO2dCQUNELElBQUksQ0FBQyxZQUFZLEdBQUcsS0FBSyxDQUFDO2FBQzFCO1FBQ0YsQ0FBQztRQUVELDhDQUFxQixHQUFyQixVQUF1QixJQUFvQixFQUFFLFdBQW1CLEVBQUUsUUFBaUIsRUFBRSxlQUF3QixFQUM1RyxjQUF1QjtZQUN2QixJQUFJLE1BQU0sR0FBRyxJQUFJLENBQUMsTUFBTSxDQUFDO1lBQ3pCLElBQUksUUFBUSxHQUFHLElBQUksQ0FBQyxRQUFRLENBQUM7WUFDN0IsSUFBSSxNQUFNLEdBQUcsSUFBSSxDQUFDLE1BQU0sRUFBRSxHQUFHLEdBQUcsTUFBQSxLQUFLLENBQUMsWUFBWSxDQUFDLElBQUksQ0FBQyxTQUFTLEVBQUUsV0FBVyxHQUFHLENBQUMsR0FBRyxDQUFDLENBQUMsRUFBRSxLQUFLLEdBQWtCLElBQUksQ0FBQztZQUNySCxJQUFJLE1BQU0sR0FBRyxJQUFJLENBQUMsTUFBTSxDQUFDO1lBQ3pCLElBQUksY0FBYyxHQUFHLElBQUksQ0FBQyxtQkFBbUIsRUFBRSxVQUFVLEdBQUcsY0FBYyxHQUFHLENBQUMsRUFBRSxTQUFTLEdBQUcsY0FBYyxDQUFDLElBQUksQ0FBQztZQUVoSCxJQUFJLENBQUMsSUFBSSxDQUFDLGFBQWEsRUFBRTtnQkFDeEIsSUFBSSxPQUFPLEdBQUcsSUFBSSxDQUFDLE9BQU8sQ0FBQztnQkFDM0IsVUFBVSxJQUFJLE1BQU0sQ0FBQyxDQUFDLENBQUMsQ0FBQyxDQUFDLENBQUMsQ0FBQyxDQUFDLENBQUM7Z0JBQzdCLElBQUksWUFBVSxHQUFHLE9BQU8sQ0FBQyxVQUFVLENBQUMsQ0FBQztnQkFDckMsSUFBSSxlQUFlO29CQUFFLFFBQVEsSUFBSSxZQUFVLENBQUM7Z0JBQzVDLElBQUksY0FBYyxFQUFFO29CQUNuQixLQUFLLElBQUksQ0FBQyxHQUFHLENBQUMsRUFBRSxDQUFDLEdBQUcsV0FBVyxFQUFFLENBQUMsRUFBRTt3QkFDbkMsTUFBTSxDQUFDLENBQUMsQ0FBQyxJQUFJLFlBQVUsQ0FBQztpQkFDekI7Z0JBQ0QsS0FBSyxHQUFHLE1BQUEsS0FBSyxDQUFDLFlBQVksQ0FBQyxJQUFJLENBQUMsS0FBSyxFQUFFLENBQUMsQ0FBQyxDQUFDO2dCQUMxQyxLQUFLLElBQUksQ0FBQyxHQUFHLENBQUMsRUFBRSxDQUFDLEdBQUcsQ0FBQyxFQUFFLEtBQUssR0FBRyxDQUFDLEVBQUUsQ0FBQyxHQUFHLFdBQVcsRUFBRSxDQUFDLEVBQUUsRUFBRSxDQUFDLElBQUksQ0FBQyxFQUFFO29CQUMvRCxJQUFJLEtBQUssR0FBRyxNQUFNLENBQUMsQ0FBQyxDQUFDLENBQUM7b0JBQ3RCLFFBQVEsSUFBSSxLQUFLLENBQUM7b0JBQ2xCLElBQUksQ0FBQyxHQUFHLFFBQVEsQ0FBQztvQkFFakIsSUFBSSxNQUFNLEVBQUU7d0JBQ1gsQ0FBQyxJQUFJLFlBQVUsQ0FBQzt3QkFDaEIsSUFBSSxDQUFDLEdBQUcsQ0FBQzs0QkFBRSxDQUFDLElBQUksWUFBVSxDQUFDO3dCQUMzQixLQUFLLEdBQUcsQ0FBQyxDQUFDO3FCQUNWO3lCQUFNLElBQUksQ0FBQyxHQUFHLENBQUMsRUFBRTt3QkFDakIsSUFBSSxTQUFTLElBQUksY0FBYyxDQUFDLE1BQU0sRUFBRTs0QkFDdkMsU0FBUyxHQUFHLGNBQWMsQ0FBQyxNQUFNLENBQUM7NEJBQ2xDLElBQUksQ0FBQyxvQkFBb0IsQ0FBQyxNQUFNLEVBQUUsQ0FBQyxFQUFFLENBQUMsRUFBRSxLQUFLLEVBQUUsQ0FBQyxFQUFFLENBQUMsQ0FBQyxDQUFDO3lCQUNyRDt3QkFDRCxJQUFJLENBQUMsaUJBQWlCLENBQUMsQ0FBQyxFQUFFLEtBQUssRUFBRSxDQUFDLEVBQUUsR0FBRyxFQUFFLENBQUMsQ0FBQyxDQUFDO3dCQUM1QyxTQUFTO3FCQUNUO3lCQUFNLElBQUksQ0FBQyxHQUFHLFlBQVUsRUFBRTt3QkFDMUIsSUFBSSxTQUFTLElBQUksY0FBYyxDQUFDLEtBQUssRUFBRTs0QkFDdEMsU0FBUyxHQUFHLGNBQWMsQ0FBQyxLQUFLLENBQUM7NEJBQ2pDLElBQUksQ0FBQyxvQkFBb0IsQ0FBQyxNQUFNLEVBQUUsY0FBYyxHQUFHLENBQUMsRUFBRSxDQUFDLEVBQUUsS0FBSyxFQUFFLENBQUMsRUFBRSxDQUFDLENBQUMsQ0FBQzt5QkFDdEU7d0JBQ0QsSUFBSSxDQUFDLGdCQUFnQixDQUFDLENBQUMsR0FBRyxZQUFVLEVBQUUsS0FBSyxFQUFFLENBQUMsRUFBRSxHQUFHLEVBQUUsQ0FBQyxDQUFDLENBQUM7d0JBQ3hELFNBQVM7cUJBQ1Q7b0JBRUQsdUNBQXVDO29CQUN2QyxRQUFRLEtBQUssRUFBRSxFQUFFO3dCQUNoQixJQUFJLFFBQU0sR0FBRyxPQUFPLENBQUMsS0FBSyxDQUFDLENBQUM7d0JBQzVCLElBQUksQ0FBQyxHQUFHLFFBQU07NEJBQUUsU0FBUzt3QkFDekIsSUFBSSxLQUFLLElBQUksQ0FBQzs0QkFDYixDQUFDLElBQUksUUFBTSxDQUFDOzZCQUNSOzRCQUNKLElBQUksSUFBSSxHQUFHLE9BQU8sQ0FBQyxLQUFLLEdBQUcsQ0FBQyxDQUFDLENBQUM7NEJBQzlCLENBQUMsR0FBRyxDQUFDLENBQUMsR0FBRyxJQUFJLENBQUMsR0FBRyxDQUFDLFFBQU0sR0FBRyxJQUFJLENBQUMsQ0FBQzt5QkFDakM7d0JBQ0QsTUFBTTtxQkFDTjtvQkFDRCxJQUFJLEtBQUssSUFBSSxTQUFTLEVBQUU7d0JBQ3ZCLFNBQVMsR0FBRyxLQUFLLENBQUM7d0JBQ2xCLElBQUksTUFBTSxJQUFJLEtBQUssSUFBSSxVQUFVLEVBQUU7NEJBQ2xDLElBQUksQ0FBQyxvQkFBb0IsQ0FBQyxNQUFNLEVBQUUsY0FBYyxHQUFHLENBQUMsRUFBRSxDQUFDLEVBQUUsS0FBSyxFQUFFLENBQUMsRUFBRSxDQUFDLENBQUMsQ0FBQzs0QkFDdEUsSUFBSSxDQUFDLG9CQUFvQixDQUFDLE1BQU0sRUFBRSxDQUFDLEVBQUUsQ0FBQyxFQUFFLEtBQUssRUFBRSxDQUFDLEVBQUUsQ0FBQyxDQUFDLENBQUM7eUJBQ3JEOzs0QkFDQSxJQUFJLENBQUMsb0JBQW9CLENBQUMsTUFBTSxFQUFFLEtBQUssR0FBRyxDQUFDLEdBQUcsQ0FBQyxFQUFFLENBQUMsRUFBRSxLQUFLLEVBQUUsQ0FBQyxFQUFFLENBQUMsQ0FBQyxDQUFDO3FCQUNsRTtvQkFDRCxJQUFJLENBQUMsZ0JBQWdCLENBQUMsQ0FBQyxFQUFFLEtBQUssQ0FBQyxDQUFDLENBQUMsRUFBRSxLQUFLLENBQUMsQ0FBQyxDQUFDLEVBQUUsS0FBSyxDQUFDLENBQUMsQ0FBQyxFQUFFLEtBQUssQ0FBQyxDQUFDLENBQUMsRUFBRSxLQUFLLENBQUMsQ0FBQyxDQUFDLEVBQUUsS0FBSyxDQUFDLENBQUMsQ0FBQyxFQUFFLEtBQUssQ0FBQyxDQUFDLENBQUMsRUFBRSxLQUFLLENBQUMsQ0FBQyxDQUFDLEVBQUUsR0FBRyxFQUFFLENBQUMsRUFDOUcsUUFBUSxJQUFJLENBQUMsQ0FBQyxHQUFHLENBQUMsSUFBSSxLQUFLLElBQUksQ0FBQyxDQUFDLENBQUMsQ0FBQztpQkFDcEM7Z0JBQ0QsT0FBTyxHQUFHLENBQUM7YUFDWDtZQUVELGtCQUFrQjtZQUNsQixJQUFJLE1BQU0sRUFBRTtnQkFDWCxjQUFjLElBQUksQ0FBQyxDQUFDO2dCQUNwQixLQUFLLEdBQUcsTUFBQSxLQUFLLENBQUMsWUFBWSxDQUFDLElBQUksQ0FBQyxLQUFLLEVBQUUsY0FBYyxDQUFDLENBQUM7Z0JBQ3ZELElBQUksQ0FBQyxvQkFBb0IsQ0FBQyxNQUFNLEVBQUUsQ0FBQyxFQUFFLGNBQWMsR0FBRyxDQUFDLEVBQUUsS0FBSyxFQUFFLENBQUMsRUFBRSxDQUFDLENBQUMsQ0FBQztnQkFDdEUsSUFBSSxDQUFDLG9CQUFvQixDQUFDLE1BQU0sRUFBRSxDQUFDLEVBQUUsQ0FBQyxFQUFFLEtBQUssRUFBRSxjQUFjLEdBQUcsQ0FBQyxFQUFFLENBQUMsQ0FBQyxDQUFDO2dCQUN0RSxLQUFLLENBQUMsY0FBYyxHQUFHLENBQUMsQ0FBQyxHQUFHLEtBQUssQ0FBQyxDQUFDLENBQUMsQ0FBQztnQkFDckMsS0FBSyxDQUFDLGNBQWMsR0FBRyxDQUFDLENBQUMsR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDLENBQUM7YUFDckM7aUJBQU07Z0JBQ04sVUFBVSxFQUFFLENBQUM7Z0JBQ2IsY0FBYyxJQUFJLENBQUMsQ0FBQztnQkFDcEIsS0FBSyxHQUFHLE1BQUEsS0FBSyxDQUFDLFlBQVksQ0FBQyxJQUFJLENBQUMsS0FBSyxFQUFFLGNBQWMsQ0FBQyxDQUFDO2dCQUN2RCxJQUFJLENBQUMsb0JBQW9CLENBQUMsTUFBTSxFQUFFLENBQUMsRUFBRSxjQUFjLEVBQUUsS0FBSyxFQUFFLENBQUMsRUFBRSxDQUFDLENBQUMsQ0FBQzthQUNsRTtZQUVELGlCQUFpQjtZQUNqQixJQUFJLE1BQU0sR0FBRyxNQUFBLEtBQUssQ0FBQyxZQUFZLENBQUMsSUFBSSxDQUFDLE1BQU0sRUFBRSxVQUFVLENBQUMsQ0FBQztZQUN6RCxJQUFJLFVBQVUsR0FBRyxDQUFDLENBQUM7WUFDbkIsSUFBSSxFQUFFLEdBQUcsS0FBSyxDQUFDLENBQUMsQ0FBQyxFQUFFLEVBQUUsR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDLEVBQUUsR0FBRyxHQUFHLENBQUMsRUFBRSxHQUFHLEdBQUcsQ0FBQyxFQUFFLEdBQUcsR0FBRyxDQUFDLEVBQUUsR0FBRyxHQUFHLENBQUMsRUFBRSxFQUFFLEdBQUcsQ0FBQyxFQUFFLEVBQUUsR0FBRyxDQUFDLENBQUM7WUFDckYsSUFBSSxJQUFJLEdBQUcsQ0FBQyxFQUFFLElBQUksR0FBRyxDQUFDLEVBQUUsS0FBSyxHQUFHLENBQUMsRUFBRSxLQUFLLEdBQUcsQ0FBQyxFQUFFLElBQUksR0FBRyxDQUFDLEVBQUUsSUFBSSxHQUFHLENBQUMsRUFBRSxHQUFHLEdBQUcsQ0FBQyxFQUFFLEdBQUcsR0FBRyxDQUFDLENBQUM7WUFDbkYsS0FBSyxJQUFJLENBQUMsR0FBRyxDQUFDLEVBQUUsQ0FBQyxHQUFHLENBQUMsRUFBRSxDQUFDLEdBQUcsVUFBVSxFQUFFLENBQUMsRUFBRSxFQUFFLENBQUMsSUFBSSxDQUFDLEVBQUU7Z0JBQ25ELEdBQUcsR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDLENBQUM7Z0JBQ2YsR0FBRyxHQUFHLEtBQUssQ0FBQyxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQUM7Z0JBQ25CLEdBQUcsR0FBRyxLQUFLLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDO2dCQUNuQixHQUFHLEdBQUcsS0FBSyxDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsQ0FBQztnQkFDbkIsRUFBRSxHQUFHLEtBQUssQ0FBQyxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQUM7Z0JBQ2xCLEVBQUUsR0FBRyxLQUFLLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDO2dCQUNsQixJQUFJLEdBQUcsQ0FBQyxFQUFFLEdBQUcsR0FBRyxHQUFHLENBQUMsR0FBRyxHQUFHLENBQUMsR0FBRyxNQUFNLENBQUM7Z0JBQ3JDLElBQUksR0FBRyxDQUFDLEVBQUUsR0FBRyxHQUFHLEdB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QWUsQ0FBQyxNQUFNLEdBQUcsQ0FBQyxDQUFDO1lBQzNCLGdCQUFnQixDQUFDLE1BQU0sR0FBRyxDQUFDLENBQUM7WUFDNUIsS0FBSyxFQUNMLEtBQUssSUFBSSxDQUFDLEdBQUcsQ0FBQyxFQUFFLENBQUMsR0FBRyxlQUFlLEVBQUUsQ0FBQyxJQUFJLENBQUMsRUFBRTtnQkFDNUMsSUFBSSxZQUFZLEdBQUcsU0FBUyxDQUFDLENBQUMsQ0FBQyxJQUFJLENBQUMsQ0FBQztnQkFDckMsSUFBSSxFQUFFLEdBQUcsUUFBUSxDQUFDLFlBQVksQ0FBQyxFQUFFLEVBQUUsR0FBRyxRQUFRLENBQUMsWUFBWSxHQUFHLENBQUMsQ0FBQyxDQUFDO2dCQUNqRSxJQUFJLEVBQUUsR0FBRyxHQUFHLENBQUMsWUFBWSxDQUFDLEVBQUUsRUFBRSxHQUFHLEdBQUcsQ0FBQyxZQUFZLEdBQUcsQ0FBQyxDQUFDLENBQUM7Z0JBRXZELFlBQVksR0FBRyxTQUFTLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxJQUFJLENBQUMsQ0FBQztnQkFDckMsSUFBSSxFQUFFLEdBQUcsUUFBUSxDQUFDLFlBQVksQ0FBQyxFQUFFLEVBQUUsR0FBRyxRQUFRLENBQUMsWUFBWSxHQUFHLENBQUMsQ0FBQyxDQUFDO2dCQUNqRSxJQUFJLEVBQUUsR0FBRyxHQUFHLENBQUMsWUFBWSxDQUFDLEVBQUUsRUFBRSxHQUFHLEdBQUcsQ0FBQyxZQUFZLEdBQUcsQ0FBQyxDQUFDLENBQUM7Z0JBRXZELFlBQVksR0FBRyxTQUFTLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxJQUFJLENBQUMsQ0FBQztnQkFDckMsSUFBSSxFQUFFLEdBQUcsUUFBUSxDQUFDLFlBQVksQ0FBQyxFQUFFLEVBQUUsR0FBRyxRQUFRLENBQUMsWUFBWSxHQUFHLENBQUMsQ0FBQyxDQUFDO2dCQUNqRSxJQUFJLEVBQUUsR0FBRyxHQUFHLENBQUMsWUFBWSxDQUFDLEVBQUUsRUFBRSxHQUFHLEdBQUcsQ0FBQyxZQUFZLEdBQUcsQ0FBQyxDQUFDLENBQUM7Z0JBRXZELEtBQUssSUFB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QkFBb0IsQ0FBQyxDQUFDLENBQUMsR0FBRyxFQUFFLENBQUM7d0JBQzdCLG9CQUFvQixDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsR0FBRyxFQUFFLENBQUM7d0JBQ2pDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDO3dCQUN0QyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsQ0FBQyxDQUFDLEdBQUcsS0FBSyxDQUFDLENBQUMsQ0FBQzt3QkFDdEMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxHQUFHLEtBQUssQ0FBQyxDQUFDLENBQUM7d0JBQ3RDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDO3dCQUN0QyxJQUFJLENBQUMsUUFBUSxFQUFFOzRCQUNkLG9CQUFvQixDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsR0FBRyxFQUFFLENBQUM7NEJBQ2pDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsR0FBRyxFQUFFLENBQUM7NEJBRWpDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsR0FBRyxFQUFFLENBQUM7NEJBQ2pDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsR0FBRyxFQUFFLENBQUM7NEJBQ2pDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxFQUFFLENBQUMsR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDOzRCQUN2QyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsS0FBSyxDQUFDLENBQUMsQ0FBQzs0QkFDdkMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLEtBQUssQ0FBQyxDQUFDLENBQUM7NEJBQ3ZDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxFQUFFLENBQUMsR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDOzRCQUN2QyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsRUFBRSxDQUFDOzRCQUNsQyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsRUFBRSxDQUFDOzRCQUVsQyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsRUFBRSxDQUFDOzRCQUNsQyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsRUFBRSxDQUFDOzRCQUNsQyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsS0FBSyxDQUFDLENBQUMsQ0FBQzs0QkFDdkMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLEtBQUssQ0FBQyxDQUFDLENBQUM7NEJBQ3ZDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxFQUFFLENBQUMsR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDOzRCQUN2QyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsS0FBSyxDQUFDLENBQUMsQ0FBQzs0QkFDdkMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLEVBQUUsQ0FBQzs0QkFDbEMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLEVBQUUsQ0FBQzt5QkFDbEM7NkJBQU07NEJBQ04sb0JBQW9CLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQzs0QkFDakMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQzs0QkFDakMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxHQUFHLElBQUksQ0FBQyxDQUFDLENBQUM7NEJBQ3JDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsR0FBRyxJQUFJLENBQUMsQ0FBQyxDQUFDOzRCQUNyQyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsSUFBSSxDQUFDLENBQUMsQ0FBQzs0QkFDdEMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLElBQUksQ0FBQyxDQUFDLENBQUM7NEJBRXRDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxFQUFFLENBQUMsR0FBRyxFQUFFLENBQUM7NEJBQ2xDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxFQUFFLENBQUMsR0FBRyxFQUFFLENBQUM7NEJBQ2xDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxFQUFFLENBQUMsR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDOzRCQUN2QyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsS0FBSyxDQUFDLENBQUMsQ0FBQzs0QkFDdkMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLEtBQUssQ0FBQyxDQUFDLENBQUM7NEJBQ3ZDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxFQUFFLENBQUMsR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDOzRCQUN2QyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsRUFBRSxDQUFDOzRCQUNsQyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsRUFBRSxDQUFDOzRCQUNsQyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsSUFBSSxDQUFDLENBQUMsQ0FBQzs0QkFDdEMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLElBQUksQ0FBQyxDQUFDLENBQUM7NEJBQ3RDLG9CQUFvQixDQUFDLENBQUMsR0FBRyxFQUFFLENBQUMsR0FBRyxJQUFJLENBQUMsQ0FBQyxDQUFDOzRCQUN0QyxvQkFBb0IsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLEdBQUcsSUFBSSxDQUFDLENBQUMsQ0FBQzs0QkFFdEMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLEVBQUUsQ0FBQzs0QkFDbEMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLEVBQUUsQ0FBQzs0QkFDbEMsb0JBQW9CLENBQUMsQ0FBQyxHQUFHLEVBQUUsQ0FBQyxHQUFHLEtBQUssQ0FBQyxDQUFDLENBQUM7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LEdBQUcsQ0FBQztZQUM1QyxJQUFJLEdBQUcsR0FBRyxJQUFJLENBQUMsR0FBRyxDQUFDLE9BQU8sQ0FBQyxDQUFDO1lBQzVCLElBQUksR0FBRyxHQUFHLElBQUksQ0FBQyxHQUFHLENBQUMsT0FBTyxDQUFDLENBQUM7WUFDNUIsSUFBSSxTQUFTLEdBQUcsTUFBTSxHQUFHLEdBQUcsR0FBRyxJQUFJLENBQUMsQ0FBQyxDQUFDO1lBQ3RDLElBQUksU0FBUyxHQUFHLE1BQU0sR0FBRyxHQUFHLENBQUM7WUFDN0IsSUFBSSxTQUFTLEdBQUcsTUFBTSxHQUFHLEdBQUcsR0FBRyxJQUFJLENBQUMsQ0FBQyxDQUFDO1lBQ3RDLElBQUksU0FBUyxHQUFHLE1BQU0sR0FBRyxHQUFHLENBQUM7WUFDN0IsSUFBSSxVQUFVLEdBQUcsT0FBTyxHQUFHLEdBQUcsR0FBRyxJQUFJLENBQUMsQ0FBQyxDQUFDO1lBQ3hDLElBQUksVUFBVSxHQUFHLE9BQU8sR0FBRyxHQUFHLENBQUM7WUFDL0IsSUFBSSxVQUFVLEdBQUcsT0FBTyxHQUFHLEdBQUcsR0FBRyxJQUFJLENBQUMsQ0FBQyxDQUFDO1lBQ3hDLElBQUksVUFBVSxHQUFHLE9BQU8sR0FBRyxHQUFHLENBQUM7WUFDL0IsSUFBSSxNQUFNLEdBQUcsSUFBSSxDQUFDLE1BQU0sQ0FBQztZQUN6QixNQUFNLENBQUMsZ0JBQWdCLENBQUMsR0FBRyxDQUFDLEdBQUcsU0FBUyxHQUFHLFNBQVMsQ0FBQztZQUNyRCxNQUFNLENBQUMsZ0JBQWdCLENBQUMsR0FBRyxDQUFDLEdBQUcsU0FBUyxHQUFHLFNBQVMsQ0FBQztZQUNyRCxNQUFNLENBQUMsZ0JBQWdCLENBQUMsR0FBRyxDQUFDLEdBQUcsU0FBUyxHQUFHLFVBQVUsQ0FBQztZQUN0RCxNQUFNLENBQUMsZ0JBQWdCLENBQUMsR0FBRyxDQUFDLEdBQUcsVUFBVSxHQUFHLFNBQVMsQ0FBQztZQUN0RCxNQUFNLENBQUMsZ0JBQWdCLENBQUMsR0FBRyxDQUFDLEdBQUcsVUFBVSxHQUFHLFVBQVUsQ0FBQztZQUN2RCxNQUFNLENB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Q0FBQyxDQUFDLEdBQUcsT0FBTyxHQUFHLENBQUMsR0FBRyxPQUFPLEdBQUcsQ0FBQyxHQUFHLENBQUMsQ0FBQztRQUMzRCxDQUFDO1FBOUlNLG9CQUFHLEdBQUcsQ0FBQyxDQUFDO1FBQ1Isb0JBQUcsR0FBRyxDQUFDLENBQUM7UUFDUixvQkFBRyxHQUFHLENBQUMsQ0FBQztRQUNSLG9CQUFHLEdBQUcsQ0FBQyxDQUFDO1FBQ1Isb0JBQUcsR0FBRyxDQUFDLENBQUM7UUFDUixvQkFBRyxHQUFHLENBQUMsQ0FBQztRQUNSLG9CQUFHLEdBQUcsQ0FBQyxDQUFDO1FBQ1Isb0JBQUcsR0FBRyxDQUFDLENBQUM7UUFFUixtQkFBRSxHQUFHLENBQUMsQ0FBQztRQUNQLG1CQUFFLEdBQUcsQ0FBQyxDQUFDO1FBQ1Asb0JBQUcsR0FBRyxDQUFDLENBQUM7UUFDUixvQkFBRyxHQUFHLENBQUMsQ0FBQztRQUNSLG9CQUFHLEdBQUcsQ0FBQyxDQUFDO1FBQ1Isb0JBQUcsR0FBRyxDQUFDLENBQUM7UUFDUixtQkFBRSxHQUFHLENBQUMsQ0FBQztRQUNQLG1CQUFFLEdBQUcsQ0FBQyxDQUFDO1FBRVAsbUJBQUUsR0FBRyxDQUFDLENBQUM7UUFDUCxtQkFBRSxHQUFHLENBQUMsQ0FBQztRQUNQLG9CQUFHLEdBQUcsRUFBRSxDQUFDO1FBQ1Qsb0JBQUcsR0FBRyxFQUFFLENBQUM7UUFDVCxvQkFBRyxHQUFHLEVBQUUsQ0FBQztRQUNULG9CQUFHLEdBQUcsRUFBRSxDQUFDO1FBQ1QsbUJBQUUsR0FBRyxFQUFFLENBQUM7UUFDUixtQkFBRSxHQUFHLEVBQUUsQ0FBQztRQUVSLG1CQUFFLEdBQUcsRUFBRSxDQUFDO1FBQ1IsbUJBQUUsR0FBRyxFQUFFLENBQUM7UUFDUixvQkFBRyxHQUFHLEVBQUUsQ0FBQztRQUNULG9CQUFHLEdBQUcsRUFBRSxDQUFDO1FBQ1Qsb0JBQUcsR0FBRyxFQUFFLENBQUM7UUFDVCxvQkFBRyxHQUFHLEVBQUUsQ0FBQztRQUNULG1CQUFFLEdBQUcsRUFBRSxDQUFDO1FBQ1IsbUJBQUUsR0FBRyxF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
+//# sourceMappingURL=egret-spine.js.map

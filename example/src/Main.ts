@@ -24,7 +24,7 @@ async function createTank() {
     // event callback
     tank.start(0).add('drive', 0, {
         loopStart() {
-            tank.x = tank.scaleX > 0 ? 300 : 900;
+            tank.x = tank.scaleX > 0 ? 200 : 1000;
             tank.scaleX *= -1;
         }
     });
@@ -68,10 +68,12 @@ async function createBoy2() {
     boy.y = stage.stageHeight * 0.5;
     boy.scaleX = boy.scaleY = 0.2;
 
-    await boy.play('test').waitNamedEvent('headAttach');
+    // await event
+    await boy.play('run').waitNamedEvent('footstep');
 
     while (true) {
-        await boy.play('run', 2).add('jump', 1).waitTrackEnd();
+        // await animation sequence
+        await boy.play('jump', 1).add('run', 2).waitTrackEnd();
     }
 }
 
@@ -130,19 +132,19 @@ function enableDragging(target: egret.DisplayObject) {
     let dragging = false;
     let dx = 0, dy = 0;
 
-    target.addEventListener(egret.TouchEvent.TOUCH_BEGIN, event => {
+    target.addEventListener(egret.TouchEvent.TOUCH_BEGIN, (event: egret.TouchEvent) => {
         dragging = true;
         dx = event.stageX - target.x;
         dy = event.stageY - target.y;
-    }, this);
+    }, null);
 
-    stage.addEventListener(egret.TouchEvent.TOUCH_MOVE, event => {
+    stage.addEventListener(egret.TouchEvent.TOUCH_MOVE, (event: egret.TouchEvent) => {
         if (dragging) {
             target.x = event.stageX - dx;
             target.y = event.stageY - dy;
         }
-    }, this);
+    }, null);
 
-    target.addEventListener(egret.TouchEvent.TOUCH_END, _ => dragging = false, this);
-    target.addEventListener(egret.TouchEvent.TOUCH_RELEASE_OUTSIDE, _ => dragging = false, this);
+    target.addEventListener(egret.TouchEvent.TOUCH_END, _ => dragging = false, null);
+    target.addEventListener(egret.TouchEvent.TOUCH_RELEASE_OUTSIDE, _ => dragging = false, null);
 }

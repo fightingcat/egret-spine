@@ -1,7 +1,9 @@
 {
     "compilerOptions": {
-        "target": "es6",
-        "outDir": "libs"
+        "target": "es5",
+        "outDir": "libs",
+        "sourceMap": true,
+        "inlineSources": true,
     },
     "include": [
         "src"
