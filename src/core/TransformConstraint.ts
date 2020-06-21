@@ -1,8 +1,8 @@
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -15,25 +15,49 @@
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
 module spine {
-	export class TransformConstraint implements Constraint {
+
+	/** Stores the current pose for a transform constraint. A transform constraint adjusts the world transform of the constrained
+	 * bones to match that of the target bone.
+	 *
+	 * See [Transform constraints](http://esotericsoftware.com/spine-transform-constraints) in the Spine User Guide. */
+	export class TransformConstraint implements Updatable {
+
+		/** The transform constraint's setup pose data. */
 		data: TransformConstraintData;
+
+		/** The bones that will be modified by this transform constraint. */
 		bones: Array<Bone>;
+
+		/** The target bone whose world transform will be copied to the constrained bones. */
 		target: Bone;
-		rotateMix = 0; translateMix = 0; scaleMix = 0; shearMix = 0;
+
+		/** A percentage (0-1) that controls the mix between the constrained and unconstrained rotations. */
+		rotateMix = 0;
+
+		/** A percentage (0-1) that controls the mix between the constrained and unconstrained translations. */
+		translateMix = 0;
+
+		/** A percentage (0-1) that controls the mix between the constrained and unconstrained scales. */
+		scaleMix = 0;
+
+		/** A percentage (0-1) that controls the mix between the constrained and unconstrained scales. */
+		shearMix = 0;
+
 		temp = new Vector2();
+		active = false;
 
 		constructor (data: TransformConstraintData, skeleton: Skeleton) {
 			if (data == null) throw new Error("data cannot be null.");
@@ -49,6 +73,11 @@ module spine {
 			this.target = skeleton.findBone(data.target.name);
 		}
 
+		isActive () {
+			return this.active;
+		}
+
+		/** Applies the constraint to the constrained bones. */
 		apply () {
 			this.update();
 		}
@@ -266,10 +295,6 @@ module spine {
 
 				bone.updateWorldTransformWith(x, y, rotation, scaleX, scaleY, bone.ashearX, shearY);
 			}
-		}
-
-		getOrder () {
-			return this.data.order;
 		}
 	}
 }

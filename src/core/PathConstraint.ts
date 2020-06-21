@@ -1,8 +1,8 @@
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -15,31 +15,54 @@
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
 module spine {
-	export class PathConstraint implements Constraint {
+
+	/** Stores the current pose for a path constraint. A path constraint adjusts the rotation, translation, and scale of the
+	 * constrained bones so they follow a {@link PathAttachment}.
+	 *
+	 * See [Path constraints](http://esotericsoftware.com/spine-path-constraints) in the Spine User Guide. */
+	export class PathConstraint implements Updatable {
 		static NONE = -1; static BEFORE = -2; static AFTER = -3;
 		static epsilon = 0.00001;
 
+		/** The path constraint's setup pose data. */
 		data: PathConstraintData;
+
+		/** The bones that will be modified by this path constraint. */
 		bones: Array<Bone>;
+
+		/** The slot whose path attachment will be used to constrained the bones. */
 		target: Slot;
-		position = 0; spacing = 0; rotateMix = 0; translateMix = 0;
+
+		/** The position along the path. */
+		position = 0;
+
+		/** The spacing between bones. */
+		spacing = 0;
+
+		/** A percentage (0-1) that controls the mix between the constrained and unconstrained rotations. */
+		rotateMix = 0;
+
+		/** A percentage (0-1) that controls the mix between the constrained and unconstrained translations. */
+		translateMix = 0;
 
 		spaces = new Array<number>(); positions = new Array<number>();
 		world = new Array<number>(); curves = new Array<number>(); lengths = new Array<number>();
 		segments = new Array<number>();
+
+		active = false;
 
 		constructor (data: PathConstraintData, skeleton: Skeleton) {
 			if (data == null) throw new Error("data cannot be null.");
@@ -55,6 +78,11 @@ module spine {
 			this.translateMix = data.translateMix;
 		}
 
+		isActive () {
+			return this.active;
+		}
+
+		/** Applies the constraint to the constrained bones. */
 		apply () {
 			this.update();
 		}
@@ -416,10 +444,6 @@ module spine {
 				else
 					out[o + 2] = Math.atan2(y - (y1 * uu + cy1 * ut * 2 + cy2 * tt), x - (x1 * uu + cx1 * ut * 2 + cx2 * tt));
 			}
-		}
-
-		getOrder () {
-			return this.data.order;
 		}
 	}
 }

@@ -1,8 +1,8 @@
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -15,16 +15,16 @@
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
 module spine {
@@ -120,6 +120,19 @@ module spine {
 			if (this.a < 0) this.a = 0;
 			else if (this.a > 1) this.a = 1;
 			return this;
+		}
+
+		static rgba8888ToColor(color: Color, value: number) {
+			color.r = ((value & 0xff000000) >>> 24) / 255;
+			color.g = ((value & 0x00ff0000) >>> 16) / 255;
+			color.b = ((value & 0x0000ff00) >>> 8) / 255;
+			color.a = ((value & 0x000000ff)) / 255;
+		}
+
+		static rgb888ToColor (color: Color, value: number) {
+			color.r = ((value & 0x00ff0000) >>> 16) / 255;
+			color.g = ((value & 0x0000ff00) >>> 8) / 255;
+			color.b = ((value & 0x000000ff)) / 255;
 		}
 	}
 
@@ -263,6 +276,13 @@ module spine {
 		static webkit602BugfixHelper (alpha: number, blend: MixBlend) {
 
 		}
+
+		static contains<T> (array: Array<T>, element: T, identity = true) {
+			for (var i = 0; i < array.length; i++) {
+				if (array[i] == element) return true;
+			}
+			return false;
+		}
 	}
 
 	export class DebugUtils {
@@ -293,8 +313,7 @@ module spine {
 
 		freeAll (items: ArrayLike<T>) {
 			for (let i = 0; i < items.length; i++) {
-				if ((items[i] as any).reset) (items[i] as any).reset();
-				this.items[i] = items[i];
+				this.free(items[i]);
 			}
 		}
 

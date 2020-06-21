@@ -1,8 +1,8 @@
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -15,22 +15,28 @@
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
 module spine {
+
+	/** A simple container for a list of timelines and a name. */
 	export class Animation {
+		/** The animation's name, which is unique across all animations in the skeleton. */
 		name: string;
 		timelines: Array<Timeline>;
+		timelineIds: Array<boolean>;
+
+		/** The duration of the animation in seconds, which is the highest time of all keys in the timeline. */
 		duration: number;
 
 		constructor (name: string, timelines: Array<Timeline>, duration: number) {
@@ -38,9 +44,21 @@ module spine {
 			if (timelines == null) throw new Error("timelines cannot be null.");
 			this.name = name;
 			this.timelines = timelines;
+			this.timelineIds = [];
+			for (var i = 0; i < timelines.length; i++)
+				this.timelineIds[timelines[i].getPropertyId()] = true;
 			this.duration = duration;
 		}
 
+		hasTimeline (id: number) {
+			return this.timelineIds[id] == true;
+		}
+
+		/** Applies all the animation's timelines to the specified skeleton.
+		 *
+		 * See Timeline {@link Timeline#apply(Skeleton, float, float, Array, float, MixBlend, MixDirection)}.
+		 * @param loop If true, the animation repeats after {@link #getDuration()}.
+		 * @param events May be null to ignore fired events. */
 		apply (skeleton: Skeleton, lastTime: number, time: number, loop: boolean, events: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection) {
 			if (skeleton == null) throw new Error("skeleton cannot be null.");
 
@@ -54,6 +72,8 @@ module spine {
 				timelines[i].apply(skeleton, lastTime, time, events, alpha, blend, direction);
 		}
 
+		/** @param target After the first and before the last value.
+	 	 * @returns index of first value greater than the target. */
 		static binarySearch (values: ArrayLike<number>, target: number, step: number = 1) {
 			let low = 0;
 			let high = values.length / step - 2;
@@ -76,20 +96,65 @@ module spine {
 		}
 	}
 
+	/** The interface for all timelines. */
 	export interface Timeline {
+		/** Applies this timeline to the skeleton.
+		 * @param skeleton The skeleton the timeline is being applied to. This provides access to the bones, slots, and other
+		 *           skeleton components the timeline may change.
+		 * @param lastTime The time this timeline was last applied. Timelines such as {@link EventTimeline}} trigger only at specific
+		 *           times rather than every frame. In that case, the timeline triggers everything between `lastTime`
+		 *           (exclusive) and `time` (inclusive).
+		 * @param time The time within the animation. Most timelines find the key before and the key after this time so they can
+		 *           interpolate between the keys.
+		 * @param events If any events are fired, they are added to this list. Can be null to ignore fired events or if the timeline
+		 *           does not fire events.
+		 * @param alpha 0 applies the current or setup value (depending on `blend`). 1 applies the timeline value.
+		 *           Between 0 and 1 applies a value between the current or setup value and the timeline value. By adjusting
+		 *           `alpha` over time, an animation can be mixed in or out. `alpha` can also be useful to
+		 *           apply animations on top of each other (layering).
+		 * @param blend Controls how mixing is applied when `alpha` < 1.
+		 * @param direction Indicates whether the timeline is mixing in or out. Used by timelines which perform instant transitions,
+		 *           such as {@link DrawOrderTimeline} or {@link AttachmentTimeline}. */
 		apply (skeleton: Skeleton, lastTime: number, time: number, events: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection): void;
+
+		/** Uniquely encodes both the type of this timeline and the skeleton property that it affects. */
 		getPropertyId (): number;
 	}
 
+	/** Controls how a timeline value is mixed with the setup pose value or current pose value when a timeline's `alpha`
+	 * < 1.
+	 *
+	 * See Timeline {@link Timeline#apply(Skeleton, float, float, Array, float, MixBlend, MixDirection)}. */
 	export enum MixBlend {
+		/** Transitions from the setup value to the timeline value (the current value is not used). Before the first key, the setup
+		 * value is set. */
 		setup,
+		/** Transitions from the current value to the timeline value. Before the first key, transitions from the current value to
+		 * the setup value. Timelines which perform instant transitions, such as {@link DrawOrderTimeline} or
+		 * {@link AttachmentTimeline}, use the setup value before the first key.
+		 *
+		 * `first` is intended for the first animations applied, not for animations layered on top of those. */
 		first,
+		/** Transitions from the current value to the timeline value. No change is made before the first key (the current value is
+		 * kept until the first key).
+		 *
+		 * `replace` is intended for animations layered on top of others, not for the first animations applied. */
 		replace,
+		/** Transitions from the current value to the current value plus the timeline value. No change is made before the first key
+		 * (the current value is kept until the first key).
+		 *
+		 * `add` is intended for animations layered on top of others, not for the first animations applied. Properties
+		 * keyed by additive animations must be set manually or by another animation before applying the additive animations, else
+		 * the property values will increase continually. */
 		add
 	}
 
+	/** Indicates whether a timeline's `alpha` is mixing out over time toward 0 (the setup or current pose value) or
+	 * mixing in toward 1 (the timeline's value).
+	 *
+	 * See Timeline {@link Timeline#apply(Skeleton, float, float, Array, float, MixBlend, MixDirection)}. */
 	export enum MixDirection {
-		in, out
+		mixIn, mixOut
 	}
 
 	export enum TimelineType {
@@ -101,6 +166,7 @@ module spine {
 		twoColor
 	}
 
+	/** The base class for timelines that use interpolation between key frame values. */
 	export abstract class CurveTimeline implements Timeline {
 		static LINEAR = 0; static STEPPED = 1; static BEZIER = 2;
 		static BEZIER_SIZE = 10 * 2 - 1;
@@ -114,18 +180,23 @@ module spine {
 			this.curves = Utils.newFloatArray((frameCount - 1) * CurveTimeline.BEZIER_SIZE);
 		}
 
+		/** The number of key frames for this timeline. */
 		getFrameCount () {
 			return this.curves.length / CurveTimeline.BEZIER_SIZE + 1;
 		}
 
+		/** Sets the specified key frame to linear interpolation. */
 		setLinear (frameIndex: number) {
 			this.curves[frameIndex * CurveTimeline.BEZIER_SIZE] = CurveTimeline.LINEAR;
 		}
 
+		/** Sets the specified key frame to stepped interpolation. */
 		setStepped (frameIndex: number) {
 			this.curves[frameIndex * CurveTimeline.BEZIER_SIZE] = CurveTimeline.STEPPED;
 		}
 
+		/** Returns the interpolation type for the specified key frame.
+		 * @returns Linear is 0, stepped is 1, Bezier is 2. */
 		getCurveType (frameIndex: number): number {
 			let index = frameIndex * CurveTimeline.BEZIER_SIZE;
 			if (index == this.curves.length) return CurveTimeline.LINEAR;
@@ -135,9 +206,9 @@ module spine {
 			return CurveTimeline.BEZIER;
 		}
 
-		/** Sets the control handle positions for an interpolation bezier curve used to transition from this keyframe to the next.
-		 * cx1 and cx2 are from 0 to 1, representing the percent of time between the two keyframes. cy1 and cy2 are the percent of
-		 * the difference between the keyframe's values. */
+		/** Sets the specified key frame to Bezier interpolation. `cx1` and `cx2` are from 0 to 1,
+		 * representing the percent of time between the two key frames. `cy1` and `cy2` are the percent of the
+		 * difference between the key frame's values. */
 		setCurve (frameIndex: number, cx1: number, cy1: number, cx2: number, cy2: number) {
 			let tmpx = (-cx1 * 2 + cx2) * 0.03, tmpy = (-cy1 * 2 + cy2) * 0.03;
 			let dddfx = ((cx1 - cx2) * 3 + 1) * 0.006, dddfy = ((cy1 - cy2) * 3 + 1) * 0.006;
@@ -161,6 +232,7 @@ module spine {
 			}
 		}
 
+		/** Returns the interpolated percentage for the specified key frame and linear percentage. */
 		getCurvePercent (frameIndex: number, percent: number) {
 			percent = MathUtils.clamp(percent, 0, 1);
 			let curves = this.curves;
@@ -191,12 +263,16 @@ module spine {
 		abstract apply (skeleton: Skeleton, lastTime: number, time: number, events: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection): void;
 	}
 
+	/** Changes a bone's local {@link Bone#rotation}. */
 	export class RotateTimeline extends CurveTimeline {
 		static ENTRIES = 2;
 		static PREV_TIME = -2; static PREV_ROTATION = -1;
 		static ROTATION = 1;
 
+		/** The index of the bone in {@link Skeleton#bones} that will be changed. */
 		boneIndex: number;
+
+		/** The time in seconds and rotation in degrees for each key frame. */
 		frames: ArrayLike<number>; // time, degrees, ...
 
 		constructor (frameCount: number) {
@@ -219,6 +295,7 @@ module spine {
 			let frames = this.frames;
 
 			let bone = skeleton.bones[this.boneIndex];
+			if (!bone.active) return;
 			if (time < frames[0]) {
 				switch (blend) {
 				case MixBlend.setup:
@@ -269,12 +346,16 @@ module spine {
 		}
 	}
 
+	/** Changes a bone's local {@link Bone#x} and {@link Bone#y}. */
 	export class TranslateTimeline extends CurveTimeline {
 		static ENTRIES = 3;
 		static PREV_TIME = -3; static PREV_X = -2; static PREV_Y = -1;
 		static X = 1; static Y = 2;
 
+		/** The index of the bone in {@link Skeleton#bones} that will be changed. */
 		boneIndex: number;
+
+		/** The time in seconds, x, and y values for each key frame. */
 		frames: ArrayLike<number>; // time, x, y, ...
 
 		constructor (frameCount: number) {
@@ -286,7 +367,7 @@ module spine {
 			return (TimelineType.translate << 24) + this.boneIndex;
 		}
 
-		/** Sets the time and value of the specified keyframe. */
+		/** Sets the time in seconds, x, and y values for the specified key frame. */
 		setFrame (frameIndex: number, time: number, x: number, y: number) {
 			frameIndex *= TranslateTimeline.ENTRIES;
 			this.frames[frameIndex] = time;
@@ -298,6 +379,7 @@ module spine {
 			let frames = this.frames;
 
 			let bone = skeleton.bones[this.boneIndex];
+			if (!bone.active) return;
 			if (time < frames[0]) {
 				switch (blend) {
 				case MixBlend.setup:
@@ -344,6 +426,7 @@ module spine {
 		}
 	}
 
+	/** Changes a bone's local {@link Bone#scaleX)} and {@link Bone#scaleY}. */
 	export class ScaleTimeline extends TranslateTimeline {
 		constructor (frameCount: number) {
 			super(frameCount);
@@ -357,6 +440,7 @@ module spine {
 			let frames = this.frames;
 
 			let bone = skeleton.bones[this.boneIndex];
+			if (!bone.active) return;
 			if (time < frames[0]) {
 				switch (blend) {
 				case MixBlend.setup:
@@ -396,7 +480,7 @@ module spine {
 				}
 			} else {
 				let bx = 0, by = 0;
-				if (direction == MixDirection.out) {
+				if (direction == MixDirection.mixOut) {
 					switch (blend) {
 					case MixBlend.setup:
 						bx = bone.data.scaleX;
@@ -443,6 +527,7 @@ module spine {
 		}
 	}
 
+	/** Changes a bone's local {@link Bone#shearX} and {@link Bone#shearY}. */
 	export class ShearTimeline extends TranslateTimeline {
 		constructor (frameCount: number) {
 			super(frameCount);
@@ -456,6 +541,7 @@ module spine {
 			let frames = this.frames;
 
 			let bone = skeleton.bones[this.boneIndex];
+			if (!bone.active) return;
 			if (time < frames[0]) {
 				switch (blend) {
 				case MixBlend.setup:
@@ -502,12 +588,16 @@ module spine {
 		}
 	}
 
+	/** Changes a slot's {@link Slot#color}. */
 	export class ColorTimeline extends CurveTimeline {
 		static ENTRIES = 5;
 		static PREV_TIME = -5; static PREV_R = -4; static PREV_G = -3; static PREV_B = -2; static PREV_A = -1;
 		static R = 1; static G = 2; static B = 3; static A = 4;
 
+		/** The index of the slot in {@link Skeleton#slots} that will be changed. */
 		slotIndex: number;
+
+		/** The time in seconds, red, green, blue, and alpha values for each key frame. */
 		frames: ArrayLike<number>; // time, r, g, b, a, ...
 
 		constructor (frameCount: number) {
@@ -519,7 +609,7 @@ module spine {
 			return (TimelineType.color << 24) + this.slotIndex;
 		}
 
-		/** Sets the time and value of the specified keyframe. */
+		/** Sets the time in seconds, red, green, blue, and alpha for the specified key frame. */
 		setFrame (frameIndex: number, time: number, r: number, g: number, b: number, a: number) {
 			frameIndex *= ColorTimeline.ENTRIES;
 			this.frames[frameIndex] = time;
@@ -531,6 +621,7 @@ module spine {
 
 		apply (skeleton: Skeleton, lastTime: number, time: number, events: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection) {
 			let slot = skeleton.slots[this.slotIndex];
+			if (!slot.bone.active) return;
 			let frames = this.frames;
 			if (time < frames[0]) {
 				switch (blend) {
@@ -578,13 +669,18 @@ module spine {
 		}
 	}
 
+	/** Changes a slot's {@link Slot#color} and {@link Slot#darkColor} for two color tinting. */
 	export class TwoColorTimeline extends CurveTimeline {
 		static ENTRIES = 8;
 		static PREV_TIME = -8; static PREV_R = -7; static PREV_G = -6; static PREV_B = -5; static PREV_A = -4;
 		static PREV_R2 = -3; static PREV_G2 = -2; static PREV_B2 = -1;
 		static R = 1; static G = 2; static B = 3; static A = 4; static R2 = 5; static G2 = 6; static B2 = 7;
 
+		/** The index of the slot in {@link Skeleton#slots()} that will be changed. The {@link Slot#darkColor()} must not be
+		 * null. */
 		slotIndex: number;
+
+		/** The time in seconds, red, green, blue, and alpha values of the color, red, green, blue of the dark color, for each key frame. */
 		frames: ArrayLike<number>; // time, r, g, b, a, r2, g2, b2, ...
 
 		constructor (frameCount: number) {
@@ -596,7 +692,7 @@ module spine {
 			return (TimelineType.twoColor << 24) + this.slotIndex;
 		}
 
-		/** Sets the time and value of the specified keyframe. */
+		/** Sets the time in seconds, light, and dark colors for the specified key frame. */
 		setFrame (frameIndex: number, time: number, r: number, g: number, b: number, a: number, r2: number, g2: number, b2: number) {
 			frameIndex *= TwoColorTimeline.ENTRIES;
 			this.frames[frameIndex] = time;
@@ -611,6 +707,7 @@ module spine {
 
 		apply (skeleton: Skeleton, lastTime: number, time: number, events: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection) {
 			let slot = skeleton.slots[this.slotIndex];
+			if (!slot.bone.active) return;
 			let frames = this.frames;
 			if (time < frames[0]) {
 				switch (blend) {
@@ -674,9 +771,15 @@ module spine {
 		}
 	}
 
+	/** Changes a slot's {@link Slot#attachment}. */
 	export class AttachmentTimeline implements Timeline {
+		/** The index of the slot in {@link Skeleton#slots} that will be changed. */
 		slotIndex: number;
+
+		/** The time in seconds for each key frame. */
 		frames: ArrayLike<number> // time, ...
+
+		/** The attachment name for each key frame. May contain null values to clear the attachment. */
 		attachmentNames: Array<string>;
 
 		constructor (frameCount: number) {
@@ -688,11 +791,12 @@ module spine {
 			return (TimelineType.attachment << 24) + this.slotIndex;
 		}
 
+		/** The number of key frames for this timeline. */
 		getFrameCount () {
 			return this.frames.length;
 		}
 
-		/** Sets the time and value of the specified keyframe. */
+		/** Sets the time in seconds and the attachment name for the specified key frame. */
 		setFrame (frameIndex: number, time: number, attachmentName: string) {
 			this.frames[frameIndex] = time;
 			this.attachmentNames[frameIndex] = attachmentName;
@@ -700,18 +804,16 @@ module spine {
 
 		apply (skeleton: Skeleton, lastTime: number, time: number, events: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection) {
 			let slot = skeleton.slots[this.slotIndex];
-			if (direction == MixDirection.out && blend == MixBlend.setup) {
-				let attachmentName = slot.data.attachmentName;
-				slot.setAttachment(attachmentName == null ? null : skeleton.getAttachment(this.slotIndex, attachmentName));
+			if (!slot.bone.active) return;
+			if (direction == MixDirection.mixOut) {
+				if (blend == MixBlend.setup)
+					this.setAttachment(skeleton, slot, slot.data.attachmentName);
 				return;
 			}
 
 			let frames = this.frames;
 			if (time < frames[0]) {
-				if (blend == MixBlend.setup || blend == MixBlend.first) {
-					let attachmentName = slot.data.attachmentName;
-					slot.setAttachment(attachmentName == null ? null : skeleton.getAttachment(this.slotIndex, attachmentName));
-				}
+				if (blend == MixBlend.setup || blend == MixBlend.first) this.setAttachment(skeleton, slot, slot.data.attachmentName);
 				return;
 			}
 
@@ -725,14 +827,26 @@ module spine {
 			skeleton.slots[this.slotIndex]
 				.setAttachment(attachmentName == null ? null : skeleton.getAttachment(this.slotIndex, attachmentName));
 		}
+
+		setAttachment(skeleton: Skeleton, slot: Slot, attachmentName: string) {
+			slot.attachment = attachmentName == null ? null : skeleton.getAttachment(this.slotIndex, attachmentName);
+		}
 	}
 
 	let zeros : ArrayLike<number> = null;
 
+	/** Changes a slot's {@link Slot#deform} to deform a {@link VertexAttachment}. */
 	export class DeformTimeline extends CurveTimeline {
+		/** The index of the slot in {@link Skeleton#getSlots()} that will be changed. */
 		slotIndex: number;
+
+		/** The attachment that will be deformed. */
 		attachment: VertexAttachment;
+
+		/** The time in seconds for each key frame. */
 		frames: ArrayLike<number>; // time, ...
+
+		/** The vertices for each key frame. */
 		frameVertices: Array<ArrayLike<number>>;
 
 		constructor (frameCount: number) {
@@ -746,7 +860,8 @@ module spine {
 			return (TimelineType.deform << 27) + + this.attachment.id + this.slotIndex;
 		}
 
-		/** Sets the time of the specified keyframe. */
+		/** Sets the time in seconds and the vertices for the specified key frame.
+		 * @param vertices Vertex positions for an unweighted VertexAttachment, or deform offsets if it has weights. */
 		setFrame (frameIndex: number, time: number, vertices: ArrayLike<number>) {
 			this.frames[frameIndex] = time;
 			this.frameVertices[frameIndex] = vertices;
@@ -754,11 +869,12 @@ module spine {
 
 		apply (skeleton: Skeleton, lastTime: number, time: number, firedEvents: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection) {
 			let slot: Slot = skeleton.slots[this.slotIndex];
+			if (!slot.bone.active) return;
 			let slotAttachment: Attachment = slot.getAttachment();
-			if (!(slotAttachment instanceof VertexAttachment) || !(<VertexAttachment>slotAttachment).applyDeform(this.attachment)) return;
+			if (!(slotAttachment instanceof VertexAttachment) || !((<VertexAttachment>slotAttachment).deformAttachment == this.attachment)) return;
 
-			let verticesArray: Array<number> = slot.attachmentVertices;
-			if (verticesArray.length == 0) blend = MixBlend.setup;
+			let deformArray: Array<number> = slot.deform;
+			if (deformArray.length == 0) blend = MixBlend.setup;
 
 			let frameVertices = this.frameVertices;
 			let vertexCount = frameVertices[0].length;
@@ -768,30 +884,30 @@ module spine {
 				let vertexAttachment = <VertexAttachment>slotAttachment;
 				switch (blend) {
 				case MixBlend.setup:
-					verticesArray.length = 0;
+					deformArray.length = 0;
 					return;
 				case MixBlend.first:
 					if (alpha == 1) {
-						verticesArray.length = 0;
+						deformArray.length = 0;
 						break;
 					}
-					let vertices: Array<number> = Utils.setArraySize(verticesArray, vertexCount);
+					let deform: Array<number> = Utils.setArraySize(deformArray, vertexCount);
 					if (vertexAttachment.bones == null) {
 						// Unweighted vertex positions.
 						let setupVertices = vertexAttachment.vertices;
 						for (var i = 0; i < vertexCount; i++)
-							vertices[i] += (setupVertices[i] - vertices[i]) * alpha;
+							deform[i] += (setupVertices[i] - deform[i]) * alpha;
 					} else {
 						// Weighted deform offsets.
 						alpha = 1 - alpha;
 						for (var i = 0; i < vertexCount; i++)
-							vertices[i] *= alpha;
+							deform[i] *= alpha;
 					}
 				}
 				return;
 			}
 
-			let vertices: Array<number> = Utils.setArraySize(verticesArray, vertexCount);
+			let deform: Array<number> = Utils.setArraySize(deformArray, vertexCount);
 			if (time >= frames[frames.length - 1]) { // Time is after last frame.
 				let lastVertices = frameVertices[frames.length - 1];
 				if (alpha == 1) {
@@ -801,15 +917,15 @@ module spine {
 							// Unweighted vertex positions, with alpha.
 							let setupVertices = vertexAttachment.vertices;
 							for (let i = 0; i < vertexCount; i++) {
-								vertices[i] += lastVertices[i] - setupVertices[i];
+								deform[i] += lastVertices[i] - setupVertices[i];
 							}
 						} else {
 							// Weighted deform offsets, with alpha.
 							for (let i = 0; i < vertexCount; i++)
-								vertices[i] += lastVertices[i];
+								deform[i] += lastVertices[i];
 						}
 					} else {
-						Utils.arrayCopy(lastVertices, 0, vertices, 0, vertexCount);
+						Utils.arrayCopy(lastVertices, 0, deform, 0, vertexCount);
 					}
 				} else {
 					switch (blend) {
@@ -820,31 +936,32 @@ module spine {
 							let setupVertices = vertexAttachment.vertices;
 							for (let i = 0; i < vertexCount; i++) {
 								let setup = setupVertices[i];
-								vertices[i] = setup + (lastVertices[i] - setup) * alpha;
+								deform[i] = setup + (lastVertices[i] - setup) * alpha;
 							}
 						} else {
 							// Weighted deform offsets, with alpha.
 							for (let i = 0; i < vertexCount; i++)
-								vertices[i] = lastVertices[i] * alpha;
+								deform[i] = lastVertices[i] * alpha;
 						}
 						break;
 					}
 					case MixBlend.first:
 					case MixBlend.replace:
 						for (let i = 0; i < vertexCount; i++)
-							vertices[i] += (lastVertices[i] - vertices[i]) * alpha;
+							deform[i] += (lastVertices[i] - deform[i]) * alpha;
+						break;
 					case MixBlend.add:
 						let vertexAttachment = slotAttachment as VertexAttachment;
 						if (vertexAttachment.bones == null) {
 							// Unweighted vertex positions, with alpha.
 							let setupVertices = vertexAttachment.vertices;
 							for (let i = 0; i < vertexCount; i++) {
-								vertices[i] += (lastVertices[i] - setupVertices[i]) * alpha;
+								deform[i] += (lastVertices[i] - setupVertices[i]) * alpha;
 							}
 						} else {
 							// Weighted deform offsets, with alpha.
 							for (let i = 0; i < vertexCount; i++)
-								vertices[i] += lastVertices[i] * alpha;
+								deform[i] += lastVertices[i] * alpha;
 						}
 					}
 				}
@@ -866,19 +983,19 @@ module spine {
 						let setupVertices = vertexAttachment.vertices;
 						for (let i = 0; i < vertexCount; i++) {
 							let prev = prevVertices[i];
-							vertices[i] += prev + (nextVertices[i] - prev) * percent - setupVertices[i];
+							deform[i] += prev + (nextVertices[i] - prev) * percent - setupVertices[i];
 						}
 					} else {
 						// Weighted deform offsets, with alpha.
 						for (let i = 0; i < vertexCount; i++) {
 							let prev = prevVertices[i];
-							vertices[i] += prev + (nextVertices[i] - prev) * percent;
+							deform[i] += prev + (nextVertices[i] - prev) * percent;
 						}
 					}
 				} else {
 					for (let i = 0; i < vertexCount; i++) {
 						let prev = prevVertices[i];
-						vertices[i] = prev + (nextVertices[i] - prev) * percent;
+						deform[i] = prev + (nextVertices[i] - prev) * percent;
 					}
 				}
 			} else {
@@ -890,13 +1007,13 @@ module spine {
 						let setupVertices = vertexAttachment.vertices;
 						for (let i = 0; i < vertexCount; i++) {
 							let prev = prevVertices[i], setup = setupVertices[i];
-							vertices[i] = setup + (prev + (nextVertices[i] - prev) * percent - setup) * alpha;
+							deform[i] = setup + (prev + (nextVertices[i] - prev) * percent - setup) * alpha;
 						}
 					} else {
 						// Weighted deform offsets, with alpha.
 						for (let i = 0; i < vertexCount; i++) {
 							let prev = prevVertices[i];
-							vertices[i] = (prev + (nextVertices[i] - prev) * percent) * alpha;
+							deform[i] = (prev + (nextVertices[i] - prev) * percent) * alpha;
 						}
 					}
 					break;
@@ -905,7 +1022,7 @@ module spine {
 				case MixBlend.replace:
 					for (let i = 0; i < vertexCount; i++) {
 						let prev = prevVertices[i];
-						vertices[i] += (prev + (nextVertices[i] - prev) * percent - vertices[i]) * alpha;
+						deform[i] += (prev + (nextVertices[i] - prev) * percent - deform[i]) * alpha;
 					}
 					break;
 				case MixBlend.add:
@@ -915,13 +1032,13 @@ module spine {
 						let setupVertices = vertexAttachment.vertices;
 						for (let i = 0; i < vertexCount; i++) {
 							let prev = prevVertices[i];
-							vertices[i] += (prev + (nextVertices[i] - prev) * percent - setupVertices[i]) * alpha;
+							deform[i] += (prev + (nextVertices[i] - prev) * percent - setupVertices[i]) * alpha;
 						}
 					} else {
 						// Weighted deform offsets, with alpha.
 						for (let i = 0; i < vertexCount; i++) {
 							let prev = prevVertices[i];
-							vertices[i] += (prev + (nextVertices[i] - prev) * percent) * alpha;
+							deform[i] += (prev + (nextVertices[i] - prev) * percent) * alpha;
 						}
 					}
 				}
@@ -929,8 +1046,12 @@ module spine {
 		}
 	}
 
+	/** Fires an {@link Event} when specific animation times are reached. */
 	export class EventTimeline implements Timeline {
+		/** The time in seconds for each key frame. */
 		frames: ArrayLike<number>; // time, ...
+
+		/** The event for each key frame. */
 		events: Array<Event>;
 
 		constructor (frameCount: number) {
@@ -942,17 +1063,18 @@ module spine {
 			return TimelineType.event << 24;
 		}
 
+		/** The number of key frames for this timeline. */
 		getFrameCount () {
 			return this.frames.length;
 		}
 
-		/** Sets the time of the specified keyframe. */
+		/** Sets the time in seconds and the event for the specified key frame. */
 		setFrame (frameIndex: number, event: Event) {
 			this.frames[frameIndex] = event.time;
 			this.events[frameIndex] = event;
 		}
 
-		/** Fires events for frames > lastTime and <= time. */
+		/** Fires events for frames > `lastTime` and <= `time`. */
 		apply (skeleton: Skeleton, lastTime: number, time: number, firedEvents: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection) {
 			if (firedEvents == null) return;
 			let frames = this.frames;
@@ -981,8 +1103,12 @@ module spine {
 		}
 	}
 
+	/** Changes a skeleton's {@link Skeleton#drawOrder}. */
 	export class DrawOrderTimeline implements Timeline {
+		/** The time in seconds for each key frame. */
 		frames: ArrayLike<number>; // time, ...
+
+		/** The draw order for each key frame. See {@link #setFrame(int, float, int[])}. */
 		drawOrders: Array<Array<number>>;
 
 		constructor (frameCount: number) {
@@ -994,12 +1120,14 @@ module spine {
 			return TimelineType.drawOrder << 24;
 		}
 
+		/** The number of key frames for this timeline. */
 		getFrameCount () {
 			return this.frames.length;
 		}
 
-		/** Sets the time of the specified keyframe.
-		 * @param drawOrder May be null to use bind pose draw order. */
+		/** Sets the time in seconds and the draw order for the specified key frame.
+		 * @param drawOrder For each slot in {@link Skeleton#slots}, the index of the new draw order. May be null to use setup pose
+		 *           draw order. */
 		setFrame (frameIndex: number, time: number, drawOrder: Array<number>) {
 			this.frames[frameIndex] = time;
 			this.drawOrders[frameIndex] = drawOrder;
@@ -1008,8 +1136,8 @@ module spine {
 		apply (skeleton: Skeleton, lastTime: number, time: number, firedEvents: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection) {
 			let drawOrder: Array<Slot> = skeleton.drawOrder;
 			let slots: Array<Slot> = skeleton.slots;
-			if (direction == MixDirection.out && blend == MixBlend.setup) {
-				Utils.arrayCopy(skeleton.slots, 0, skeleton.drawOrder, 0, skeleton.slots.length);
+			if (direction == MixDirection.mixOut) {
+				if (blend == MixBlend.setup) Utils.arrayCopy(skeleton.slots, 0, skeleton.drawOrder, 0, skeleton.slots.length);
 				return;
 			}
 
@@ -1035,13 +1163,18 @@ module spine {
 		}
 	}
 
+	/** Changes an IK constraint's {@link IkConstraint#mix}, {@link IkConstraint#softness},
+	 * {@link IkConstraint#bendDirection}, {@link IkConstraint#stretch}, and {@link IkConstraint#compress}. */
 	export class IkConstraintTimeline extends CurveTimeline {
-		static ENTRIES = 5;
-		static PREV_TIME = -5; static PREV_MIX = -4; static PREV_BEND_DIRECTION = -3; static PREV_COMPRESS = -2; static PREV_STRETCH = -1;
-		static MIX = 1; static BEND_DIRECTION = 2; static COMPRESS = 3; static STRETCH = 4;
+		static ENTRIES = 6;
+		static PREV_TIME = -6; static PREV_MIX = -5; static PREV_SOFTNESS = -4; static PREV_BEND_DIRECTION = -3; static PREV_COMPRESS = -2; static PREV_STRETCH = -1;
+		static MIX = 1; static SOFTNESS = 2; static BEND_DIRECTION = 3; static COMPRESS = 4; static STRETCH = 5;
 
+		/** The index of the IK constraint slot in {@link Skeleton#ikConstraints} that will be changed. */
 		ikConstraintIndex: number;
-		frames: ArrayLike<number>; // time, mix, bendDirection, compress, stretch, ...
+
+		/** The time in seconds, mix, softness, bend direction, compress, and stretch for each key frame. */
+		frames: ArrayLike<number>; // time, mix, softness, bendDirection, compress, stretch, ...
 
 		constructor (frameCount: number) {
 			super(frameCount);
@@ -1052,11 +1185,12 @@ module spine {
 			return (TimelineType.ikConstraint << 24) + this.ikConstraintIndex;
 		}
 
-		/** Sets the time, mix and bend direction of the specified keyframe. */
-		setFrame (frameIndex: number, time: number, mix: number, bendDirection: number, compress: boolean, stretch: boolean) {
+		/** Sets the time in seconds, mix, softness, bend direction, compress, and stretch for the specified key frame. */
+		setFrame (frameIndex: number, time: number, mix: number, softness: number, bendDirection: number, compress: boolean, stretch: boolean) {
 			frameIndex *= IkConstraintTimeline.ENTRIES;
 			this.frames[frameIndex] = time;
 			this.frames[frameIndex + IkConstraintTimeline.MIX] = mix;
+			this.frames[frameIndex + IkConstraintTimeline.SOFTNESS] = softness;
 			this.frames[frameIndex + IkConstraintTimeline.BEND_DIRECTION] = bendDirection;
 			this.frames[frameIndex + IkConstraintTimeline.COMPRESS] = compress ? 1 : 0;
 			this.frames[frameIndex + IkConstraintTimeline.STRETCH] = stretch ? 1 : 0;
@@ -1065,16 +1199,19 @@ module spine {
 		apply (skeleton: Skeleton, lastTime: number, time: number, firedEvents: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection) {
 			let frames = this.frames;
 			let constraint: IkConstraint = skeleton.ikConstraints[this.ikConstraintIndex];
+			if (!constraint.active) return;
 			if (time < frames[0]) {
 				switch (blend) {
 				case MixBlend.setup:
 					constraint.mix = constraint.data.mix;
+					constraint.softness = constraint.data.softness;
 					constraint.bendDirection = constraint.data.bendDirection;
 					constraint.compress = constraint.data.compress;
 					constraint.stretch = constraint.data.stretch;
 					return;
 				case MixBlend.first:
 					constraint.mix += (constraint.data.mix - constraint.mix) * alpha;
+					constraint.softness += (constraint.data.softness - constraint.softness) * alpha;
 					constraint.bendDirection = constraint.data.bendDirection;
 					constraint.compress = constraint.data.compress;
 					constraint.stretch = constraint.data.stretch;
@@ -1085,7 +1222,9 @@ module spine {
 			if (time >= frames[frames.length - IkConstraintTimeline.ENTRIES]) { // Time is after last frame.
 				if (blend == MixBlend.setup) {
 					constraint.mix = constraint.data.mix + (frames[frames.length + IkConstraintTimeline.PREV_MIX] - constraint.data.mix) * alpha;
-					if (direction == MixDirection.out) {
+					constraint.softness = constraint.data.softness
+						+ (frames[frames.length + IkConstraintTimeline.PREV_SOFTNESS] - constraint.data.softness) * alpha;
+					if (direction == MixDirection.mixOut) {
 						constraint.bendDirection = constraint.data.bendDirection;
 						constraint.compress = constraint.data.compress;
 						constraint.stretch = constraint.data.stretch;
@@ -1096,7 +1235,8 @@ module spine {
 					}
 				} else {
 					constraint.mix += (frames[frames.length + IkConstraintTimeline.PREV_MIX] - constraint.mix) * alpha;
-					if (direction == MixDirection.in) {
+					constraint.softness += (frames[frames.length + IkConstraintTimeline.PREV_SOFTNESS] - constraint.softness) * alpha;
+					if (direction == MixDirection.mixIn) {
 						constraint.bendDirection = frames[frames.length + IkConstraintTimeline.PREV_BEND_DIRECTION];
 						constraint.compress = frames[frames.length + IkConstraintTimeline.PREV_COMPRESS] != 0;
 						constraint.stretch = frames[frames.length + IkConstraintTimeline.PREV_STRETCH] != 0;
@@ -1108,13 +1248,16 @@ module spine {
 			// Interpolate between the previous frame and the current frame.
 			let frame = Animation.binarySearch(frames, time, IkConstraintTimeline.ENTRIES);
 			let mix = frames[frame + IkConstraintTimeline.PREV_MIX];
+			let softness = frames[frame + IkConstraintTimeline.PREV_SOFTNESS];
 			let frameTime = frames[frame];
 			let percent = this.getCurvePercent(frame / IkConstraintTimeline.ENTRIES - 1,
 				1 - (time - frameTime) / (frames[frame + IkConstraintTimeline.PREV_TIME] - frameTime));
 
 			if (blend == MixBlend.setup) {
 				constraint.mix = constraint.data.mix + (mix + (frames[frame + IkConstraintTimeline.MIX] - mix) * percent - constraint.data.mix) * alpha;
-				if (direction == MixDirection.out) {
+				constraint.softness = constraint.data.softness
+					+ (softness + (frames[frame + IkConstraintTimeline.SOFTNESS] - softness) * percent - constraint.data.softness) * alpha;
+				if (direction == MixDirection.mixOut) {
 					constraint.bendDirection = constraint.data.bendDirection;
 					constraint.compress = constraint.data.compress;
 					constraint.stretch = constraint.data.stretch;
@@ -1125,7 +1268,8 @@ module spine {
 				}
 			} else {
 				constraint.mix += (mix + (frames[frame + IkConstraintTimeline.MIX] - mix) * percent - constraint.mix) * alpha;
-				if (direction == MixDirection.in) {
+				constraint.softness += (softness + (frames[frame + IkConstraintTimeline.SOFTNESS] - softness) * percent - constraint.softness) * alpha;
+				if (direction == MixDirection.mixIn) {
 					constraint.bendDirection = frames[frame + IkConstraintTimeline.PREV_BEND_DIRECTION];
 					constraint.compress = frames[frame + IkConstraintTimeline.PREV_COMPRESS] != 0;
 					constraint.stretch = frames[frame + IkConstraintTimeline.PREV_STRETCH] != 0;
@@ -1134,12 +1278,17 @@ module spine {
 		}
 	}
 
+	/** Changes a transform constraint's {@link TransformConstraint#rotateMix}, {@link TransformConstraint#translateMix},
+	 * {@link TransformConstraint#scaleMix}, and {@link TransformConstraint#shearMix}. */
 	export class TransformConstraintTimeline extends CurveTimeline {
 		static ENTRIES = 5;
 		static PREV_TIME = -5; static PREV_ROTATE = -4; static PREV_TRANSLATE = -3; static PREV_SCALE = -2; static PREV_SHEAR = -1;
 		static ROTATE = 1; static TRANSLATE = 2; static SCALE = 3; static SHEAR = 4;
 
+		/** The index of the transform constraint slot in {@link Skeleton#transformConstraints} that will be changed. */
 		transformConstraintIndex: number;
+
+		/** The time in seconds, rotate mix, translate mix, scale mix, and shear mix for each key frame. */
 		frames: ArrayLike<number>; // time, rotate mix, translate mix, scale mix, shear mix, ...
 
 		constructor (frameCount: number) {
@@ -1151,7 +1300,7 @@ module spine {
 			return (TimelineType.transformConstraint << 24) + this.transformConstraintIndex;
 		}
 
-		/** Sets the time and mixes of the specified keyframe. */
+		/** The time in seconds, rotate mix, translate mix, scale mix, and shear mix for the specified key frame. */
 		setFrame (frameIndex: number, time: number, rotateMix: number, translateMix: number, scaleMix: number, shearMix: number) {
 			frameIndex *= TransformConstraintTimeline.ENTRIES;
 			this.frames[frameIndex] = time;
@@ -1165,6 +1314,7 @@ module spine {
 			let frames = this.frames;
 
 			let constraint: TransformConstraint = skeleton.transformConstraints[this.transformConstraintIndex];
+			if (!constraint.active) return;
 			if (time < frames[0]) {
 				let data = constraint.data;
 				switch (blend) {
@@ -1221,13 +1371,16 @@ module spine {
 		}
 	}
 
+	/** Changes a path constraint's {@link PathConstraint#position}. */
 	export class PathConstraintPositionTimeline extends CurveTimeline {
 		static ENTRIES = 2;
 		static PREV_TIME = -2; static PREV_VALUE = -1;
 		static VALUE = 1;
 
+		/** The index of the path constraint slot in {@link Skeleton#pathConstraints} that will be changed. */
 		pathConstraintIndex: number;
 
+		/** The time in seconds and path constraint position for each key frame. */
 		frames: ArrayLike<number>; // time, position, ...
 
 		constructor (frameCount: number) {
@@ -1239,7 +1392,7 @@ module spine {
 			return (TimelineType.pathConstraintPosition << 24) + this.pathConstraintIndex;
 		}
 
-		/** Sets the time and value of the specified keyframe. */
+		/** Sets the time in seconds and path constraint position for the specified key frame. */
 		setFrame (frameIndex: number, time: number, value: number) {
 			frameIndex *= PathConstraintPositionTimeline.ENTRIES;
 			this.frames[frameIndex] = time;
@@ -1249,6 +1402,7 @@ module spine {
 		apply (skeleton: Skeleton, lastTime: number, time: number, firedEvents: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection) {
 			let frames = this.frames;
 			let constraint: PathConstraint = skeleton.pathConstraints[this.pathConstraintIndex];
+			if (!constraint.active) return;
 			if (time < frames[0]) {
 				switch (blend) {
 				case MixBlend.setup:
@@ -1280,6 +1434,7 @@ module spine {
 		}
 	}
 
+	/** Changes a path constraint's {@link PathConstraint#spacing}. */
 	export class PathConstraintSpacingTimeline extends PathConstraintPositionTimeline {
 		constructor (frameCount: number) {
 			super(frameCount);
@@ -1292,6 +1447,7 @@ module spine {
 		apply (skeleton: Skeleton, lastTime: number, time: number, firedEvents: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection) {
 			let frames = this.frames;
 			let constraint: PathConstraint = skeleton.pathConstraints[this.pathConstraintIndex];
+			if (!constraint.active) return;
 			if (time < frames[0]) {
 				switch (blend) {
 				case MixBlend.setup:
@@ -1324,13 +1480,17 @@ module spine {
 		}
 	}
 
+	/** Changes a transform constraint's {@link PathConstraint#rotateMix} and
+	 * {@link TransformConstraint#translateMix}. */
 	export class PathConstraintMixTimeline extends CurveTimeline {
 		static ENTRIES = 3;
 		static PREV_TIME = -3; static PREV_ROTATE = -2; static PREV_TRANSLATE = -1;
 		static ROTATE = 1; static TRANSLATE = 2;
 
+		/** The index of the path constraint slot in {@link Skeleton#getPathConstraints()} that will be changed. */
 		pathConstraintIndex: number;
 
+		/** The time in seconds, rotate mix, and translate mix for each key frame. */
 		frames: ArrayLike<number>; // time, rotate mix, translate mix, ...
 
 		constructor (frameCount: number) {
@@ -1342,7 +1502,7 @@ module spine {
 			return (TimelineType.pathConstraintMix << 24) + this.pathConstraintIndex;
 		}
 
-		/** Sets the time and mixes of the specified keyframe. */
+		/** The time in seconds, rotate mix, and translate mix for the specified key frame. */
 		setFrame (frameIndex: number, time: number, rotateMix: number, translateMix: number) {
 			frameIndex *= PathConstraintMixTimeline.ENTRIES;
 			this.frames[frameIndex] = time;
@@ -1353,7 +1513,7 @@ module spine {
 		apply (skeleton: Skeleton, lastTime: number, time: number, firedEvents: Array<Event>, alpha: number, blend: MixBlend, direction: MixDirection) {
 			let frames = this.frames;
 			let constraint: PathConstraint = skeleton.pathConstraints[this.pathConstraintIndex];
-
+			if (!constraint.active) return;
 			if (time < frames[0]) {
 				switch (blend) {
 				case MixBlend.setup:

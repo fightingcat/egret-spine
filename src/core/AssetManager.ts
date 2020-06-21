@@ -1,8 +1,8 @@
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -15,16 +15,16 @@
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
 module spine {
@@ -35,14 +35,17 @@ module spine {
 		private errors: Map<string> = {};
 		private toLoad = 0;
 		private loaded = 0;
+		private rawDataUris: Map<string> = {};
 
 		constructor (textureLoader: (image: HTMLImageElement) => any, pathPrefix: string = "") {
 			this.textureLoader = textureLoader;
 			this.pathPrefix = pathPrefix;
 		}
 
-		private static downloadText (url: string, success: (data: string) => void, error: (status: number, responseText: string) => void) {
+		private downloadText (url: string, success: (data: string) => void, error: (status: number, responseText: string) => void) {
 			let request = new XMLHttpRequest();
+			request.overrideMimeType("text/html");
+			if (this.rawDataUris[url]) url = this.rawDataUris[url];
 			request.open("GET", url, true);
 			request.onload = () => {
 				if (request.status == 200) {
@@ -57,8 +60,9 @@ module spine {
 			request.send();
 		}
 
-		private static downloadBinary (url: string, success: (data: Uint8Array) => void, error: (status: number, responseText: string) => void) {
+		private downloadBinary (url: string, success: (data: Uint8Array) => void, error: (status: number, responseText: string) => void) {
 			let request = new XMLHttpRequest();
+			if (this.rawDataUris[url]) url = this.rawDataUris[url];
 			request.open("GET", url, true);
 			request.responseType = "arraybuffer";
 			request.onload = () => {
@@ -74,13 +78,36 @@ module spine {
 			request.send();
 		}
 
+		setRawDataURI(path: string, data: string) {
+			this.rawDataUris[this.pathPrefix + path] = data;
+		}
+
+		loadBinary(path: string,
+			success: (path: string, binary: Uint8Array) => void = null,
+			error: (path: string, error: string) => void = null) {
+			path = this.pathPrefix + path;
+			this.toLoad++;
+
+			this.downloadBinary(path, (data: Uint8Array): void => {
+				this.assets[path] = data;
+				if (success) success(path, data);
+				this.toLoad--;
+				this.loaded++;
+			}, (state: number, responseText: string): void => {
+				this.errors[path] = `Couldn't load binary ${path}: status ${status}, ${responseText}`;
+				if (error) error(path, `Couldn't load binary ${path}: status ${status}, ${responseText}`);
+				this.toLoad--;
+				this.loaded++;
+			});
+		}
+
 		loadText(path: string,
 			success: (path: string, text: string) => void = null,
 			error: (path: string, error: string) => void = null) {
 			path = this.pathPrefix + path;
 			this.toLoad++;
 
-			AssetManager.downloadText(path, (data: string): void => {
+			this.downloadText(path, (data: string): void => {
 				this.assets[path] = data;
 				if (success) success(path, data);
 				this.toLoad--;
@@ -97,12 +124,13 @@ module spine {
 			success: (path: string, image: HTMLImageElement) => void = null,
 			error: (path: string, error: string) => void = null) {
 			path = this.pathPrefix + path;
+			let storagePath = path;
 			this.toLoad++;
 			let img = new Image();
 			img.crossOrigin = "anonymous";
 			img.onload = (ev) => {
 				let texture = this.textureLoader(img);
-				this.assets[path] = texture;
+				this.assets[storagePath] = texture;
 				this.toLoad--;
 				this.loaded++;
 				if (success) success(path, img);
@@ -113,44 +141,24 @@ module spine {
 				this.loaded++;
 				if (error) error(path, `Couldn't load image ${path}`);
 			}
+			if (this.rawDataUris[path]) path = this.rawDataUris[path];
 			img.src = path;
 		}
 
-		loadTextureData(path: string, data: string,
-			success: (path: string, image: HTMLImageElement) => void = null,
-			error: (path: string, error: string) => void = null) {
-			path = this.pathPrefix + path;
-			this.toLoad++;
-			let img = new Image();
-			img.onload = (ev) => {
-				let texture = this.textureLoader(img);
-				this.assets[path] = texture;
-				this.toLoad--;
-				this.loaded++;
-				if (success) success(path, img);
-			}
-			img.onerror = (ev) => {
-				this.errors[path] = `Couldn't load image ${path}`;
-				this.toLoad--;
-				this.loaded++;
-				if (error) error(path, `Couldn't load image ${path}`);
-			}
-			img.src = data;
-		}
-
 		loadTextureAtlas (path: string,
-				   success: (path: string, atlas: TextureAtlas) => void = null,
-				   error: (path: string, error: string) => void = null) {
+			success: (path: string, atlas: TextureAtlas) => void = null,
+			error: (path: string, error: string) => void = null
+		) {
 			let parent = path.lastIndexOf("/") >= 0 ? path.substring(0, path.lastIndexOf("/")) : "";
 			path = this.pathPrefix + path;
 			this.toLoad++;
 
-			AssetManager.downloadText(path, (atlasData: string): void => {
+			this.downloadText(path, (atlasData: string): void => {
 				let pagesLoaded: any = { count: 0 };
 				let atlasPages = new Array<string>();
 				try {
 					let atlas = new TextureAtlas(atlasData, (path: string) => {
-						atlasPages.push(parent + "/" + path);
+						atlasPages.push(parent == "" ? path : parent + "/" + path);
 						let image = document.createElement("img") as HTMLImageElement;
 						image.width = 16;
 						image.height = 16;
@@ -174,7 +182,7 @@ module spine {
 							if (!pageLoadError) {
 								try {
 									let atlas = new TextureAtlas(atlasData, (path: string) => {
-										return this.get(parent + "/" + path);
+										return this.get(parent == "" ? path : parent + "/" + path);
 									});
 									this.assets[path] = atlas;
 									if (success) success(path, atlas);

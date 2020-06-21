@@ -1,8 +1,8 @@
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated May 1, 2019. Replaces all prior versions.
+ * Last updated January 1, 2020. Replaces all prior versions.
  *
- * Copyright (c) 2013-2019, Esoteric Software LLC
+ * Copyright (c) 2013-2020, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
@@ -15,27 +15,49 @@
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
  *
- * THIS SOFTWARE IS PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, BUSINESS
- * INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SPINE RUNTIMES ARE PROVIDED BY ESOTERIC SOFTWARE LLC "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ESOTERIC SOFTWARE LLC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
+ * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
 module spine {
+	/** Collects each visible {@link BoundingBoxAttachment} and computes the world vertices for its polygon. The polygon vertices are
+	 * provided along with convenience methods for doing hit detection. */
 	export class SkeletonBounds {
-		minX = 0; minY = 0; maxX = 0; maxY = 0;
+
+		/** The left edge of the axis aligned bounding box. */
+		minX = 0;
+
+		/** The bottom edge of the axis aligned bounding box. */
+		minY = 0;
+
+		/** The right edge of the axis aligned bounding box. */
+		maxX = 0;
+
+		/** The top edge of the axis aligned bounding box. */
+		maxY = 0;
+
+		/** The visible bounding boxes. */
 		boundingBoxes = new Array<BoundingBoxAttachment>();
+
+		/** The world vertices for the bounding box polygons. */
 		polygons = new Array<ArrayLike<number>>();
+
 		private polygonPool = new Pool<ArrayLike<number>>(() => {
 			return Utils.newFloatArray(16);
 		});
 
+		/** Clears any previous polygons, finds all visible bounding box attachments, and computes the world vertices for each bounding
+		 * box's polygon.
+		 * @param updateAabb If true, the axis aligned bounding box containing all the polygons is computed. If false, the
+		 *           SkeletonBounds AABB methods will always return true. */
 		update (skeleton: Skeleton, updateAabb: boolean) {
 			if (skeleton == null) throw new Error("skeleton cannot be null.");
 			let boundingBoxes = this.boundingBoxes;
@@ -50,6 +72,7 @@ module spine {
 
 			for (let i = 0; i < slotCount; i++) {
 				let slot = slots[i];
+				if (!slot.bone.active) continue;
 				let attachment = slot.getAttachment();
 				if (attachment instanceof BoundingBoxAttachment) {
 					let boundingBox = attachment as BoundingBoxAttachment;
@@ -154,7 +177,7 @@ module spine {
 		}
 
 		/** Returns the first bounding box attachment that contains any part of the line segment, or null. When doing many checks, it
-		 * is usually more efficient to only call this method if {@link #aabbIntersectsSegment(float, float, float, float)} returns
+		 * is usually more efficient to only call this method if {@link #aabbIntersectsSegment()} returns
 		 * true. */
 		intersectsSegment (x1: number, y1: number, x2: number, y2: number) {
 			let polygons = this.polygons;
@@ -194,10 +217,12 @@ module spine {
 			return index == -1 ? null : this.polygons[index];
 		}
 
+		/** The width of the axis aligned bounding box. */
 		getWidth () {
 			return this.maxX - this.minX;
 		}
 
+		/** The height of the axis aligned bounding box. */
 		getHeight () {
 			return this.maxY - this.minY;
 		}

@@ -28,12 +28,8 @@
  *****************************************************************************/
 
 module spine {
-
-	/** Determines how images are blended with existing pixels when drawn. */
-	export enum BlendMode {
-		Normal,
-		Additive,
-		Multiply,
-		Screen
+	/** The base class for all constraint datas. */
+	export abstract class ConstraintData {
+		constructor(public name: string, public order: number, public skinRequired: boolean) { }
 	}
 }
