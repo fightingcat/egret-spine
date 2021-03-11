@@ -1,5 +1,5 @@
 # egret-spine
-A spine runtime for Egret (Demo: https://fightingcat.github.io/egret-spine/example).
+A spine runtime for Egret (Demo: <del>https://fightingcat.github.io/egret-spine/example</del> in progress...).
 
 ## Installing
 Considering that Egret doesn't use module, neither does official spine core runtime, this runtime doesn't either, for now.

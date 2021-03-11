@@ -445,13 +445,18 @@ declare module spine {
          *
          * Result: Mix from the setup pose to the timeline pose. */
         static FIRST: number;
-        /** 1. This is the first timeline to set this property.
-         * 2. The next track entry to be applied does have a timeline to set this property.
-         * 3. The next track entry after that one does not have a timeline to set this property.
-         *
+        /** 1) A previously applied timeline has set this property.<br>
+         * 2) The next track entry to be applied does have a timeline to set this property.<br>
+         * 3) The next track entry after that one does not have a timeline to set this property.<br>
+         * Result: Mix from the current pose to the timeline pose, but do not mix out. This avoids "dipping" when crossfading
+         * animations that key the same property. A subsequent timeline will set this property using a mix. */
+        static HOLD_SUBSEQUENT: number;
+        /** 1) This is the first timeline to set this property.<br>
+         * 2) The next track entry to be applied does have a timeline to set this property.<br>
+         * 3) The next track entry after that one does not have a timeline to set this property.<br>
          * Result: Mix from the setup pose to the timeline pose, but do not mix out. This avoids "dipping" when crossfading animations
          * that key the same property. A subsequent timeline will set this property using a mix. */
-        static HOLD: number;
+        static HOLD_FIRST: number;
         /** 1. This is the first timeline to set this property.
          * 2. The next track entry to be applied does have a timeline to set this property.
          * 3. The next track entry after that one does have a timeline to set this property.
@@ -1611,7 +1616,7 @@ declare module spine {
         private queueAsset;
         loadText(clientId: string, path: string): void;
         loadJson(clientId: string, path: string): void;
-        loadTexture(clientId: string, textureLoader: (image: HTMLImageElement) => any, path: string): void;
+        loadTexture(clientId: string, textureLoader: (image: HTMLImageElement | ImageBitmap) => any, path: string): void;
         get(clientId: string, path: string): any;
         private updateClientAssets;
         isLoadingComplete(clientId: string): boolean;
@@ -2354,9 +2359,9 @@ declare module spine {
  *****************************************************************************/
 declare module spine {
     abstract class Texture {
-        protected _image: HTMLImageElement;
-        constructor(image: HTMLImageElement);
-        getImage(): HTMLImageElement;
+        protected _image: HTMLImageElement | ImageBitmap;
+        constructor(image: HTMLImageElement | ImageBitmap);
+        getImage(): HTMLImageElement | ImageBitmap;
         abstract setFilters(minFilter: TextureFilter, magFilter: TextureFilter): void;
         abstract setWraps(uWrap: TextureWrap, vWrap: TextureWrap): void;
         abstract dispose(): void;
@@ -3482,12 +3487,11 @@ declare module spine {
 }
 declare namespace spine {
     class EventEmitter<T> {
-        private events;
-        on(event: T, fn: Function, context?: any): this;
-        once(event: T, fn: Function, context?: any): this;
-        off(event: T, fn?: Function, context?: any, once?: boolean): this;
-        offAll(): this;
-        emit(event: T, ...args: any[]): this;
+        private _listeners;
+        on(event: T, fn: Function, ctx?: unknown, once?: boolean): this;
+        once(event: T, fn: Function, ctx?: unknown): this;
+        off(event: T, fn?: Function, ctx?: unknown, once?: boolean): this;
+        emit(event: T, a?: unknown, b?: unknown, c?: unknown): this;
     }
 }
 declare namespace spine {
@@ -3523,13 +3527,18 @@ declare namespace spine {
         readonly stateData: AnimationStateData;
         readonly slotRenderers: SlotRenderer[];
         constructor(skeletonData: SkeletonData);
-        findSlotRenderer(name: string): SlotRenderer;
+        findSlotRenderer(name: string): SlotRenderer | undefined;
         update(dt: number): void;
     }
-    class SlotRenderer extends egret.DisplayObjectContainer {
-        private currentSprite?;
-        renderSlot(slot: Slot, skeleton: Skeleton): void;
-        private createSprite;
+    class SlotRenderer extends egret.Mesh {
+        readonly slot: Slot;
+        premultipliedAlpha: boolean;
+        private attachment?;
+        constructor(slot: Slot);
+        renderSlot(): void;
+        private updateColor;
+        private updateRegionAttachment;
+        private updateMeshAttachment;
     }
 }
 declare namespace spine {
